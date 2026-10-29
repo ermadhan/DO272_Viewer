@@ -1,0 +1,6 @@
+{
+  "name": "DO-272 Aerodrome Spatial GIS & MCP Platform",
+  "description": "Standards-compliant RTCA DO-272 / EUROCAE ED-99 aeronautical GIS visualization, PostgreSQL/PostGIS spatial analysis, and Model Context Protocol (MCP) server.",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}

@@ -1,0 +1,13 @@
+{
+  "mcpServers": {
+    "do272-aerodrome-gis": {
+      "command": "python",
+      "args": [
+        "C:\\Users\\User\\do272-gis\\python_backend\\mcp_server.py"
+      ],
+      "env": {
+        "POSTGRES_URL": "postgresql://postgres:postgrespassword@localhost:5432/do272_aerodromes"
+      }
+    }
+  }
+}

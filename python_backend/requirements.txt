@@ -1,0 +1,14 @@
+# Python DO-272 Spatial Analysis & MCP Server Requirements
+# Designed for Cross-Platform Windows & Linux Execution
+
+fastapi>=0.110.0
+uvicorn[standard]>=0.28.0
+pydantic>=2.6.0
+psycopg2-binary>=2.9.9
+sqlalchemy>=2.0.28
+geoalchemy2>=0.14.4
+shapely>=2.0.3
+networkx>=3.2.1
+mcp>=1.0.0
+httpx>=0.27.0
+python-dotenv>=1.0.1

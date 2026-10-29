@@ -94,7 +94,7 @@ export const FeatureInspector: React.FC<FeatureInspectorProps> = ({ feature, onC
             </div>
           )}
 
-          {'heightAglMeters' in feature && (
+          {'heightAglMeters' in feature && feature.heightAglMeters !== undefined && (
             <div className="flex justify-between py-1 border-b border-slate-800/60 font-mono">
               <span className="text-slate-400">Height (AGL):</span>
               <span className="text-purple-300 font-semibold tabular-nums">
@@ -103,7 +103,7 @@ export const FeatureInspector: React.FC<FeatureInspectorProps> = ({ feature, onC
             </div>
           )}
 
-          {'elevationAmslMeters' in feature && (
+          {'elevationAmslMeters' in feature && feature.elevationAmslMeters !== undefined && (
             <div className="flex justify-between py-1 border-b border-slate-800/60 font-mono">
               <span className="text-slate-400">Elevation (AMSL):</span>
               <span className="text-purple-300 tabular-nums">{feature.elevationAmslMeters} m</span>

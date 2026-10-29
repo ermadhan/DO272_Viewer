@@ -6,7 +6,7 @@ import {
   TaxiRouteResult,
 } from '../types/do272';
 import { LayerVisibilityState } from './LayerControls';
-import { Layers, MapPin, ZoomIn, ZoomOut, Compass } from 'lucide-react';
+import { Layers, MapPin, ZoomIn, ZoomOut, Compass, Sparkles } from 'lucide-react';
 
 interface AerodromeMapProps {
   dataset: AerodromeDataset;
@@ -111,7 +111,26 @@ export const AerodromeMap: React.FC<AerodromeMapProps> = ({
     }
   }, [dataset.icao, dataset.center]);
 
-  // Render DO-272 Features on Map
+  // Fly to selected feature when selected from outside
+  useEffect(() => {
+    if (!mapInstanceRef.current || !selectedFeature) return;
+    const coords = selectedFeature.coordinates;
+    try {
+      if (Array.isArray(coords) && typeof coords[0] === 'number') {
+        mapInstanceRef.current.setView(coords as [number, number], 16, { animate: true });
+      } else if (Array.isArray(coords) && Array.isArray(coords[0])) {
+        const latLngs = (coords as [number, number][]).map(([lat, lng]) => L.latLng(lat, lng));
+        if (latLngs.length > 0) {
+          const bounds = L.latLngBounds(latLngs);
+          mapInstanceRef.current.fitBounds(bounds, { padding: [100, 100], maxZoom: 17 });
+        }
+      }
+    } catch (e) {
+      console.warn('Could not fit bounds to feature', e);
+    }
+  }, [selectedFeature]);
+
+  // Render DO-272 Features across all 43 classes on Map
   useEffect(() => {
     if (!featureLayerGroupRef.current) return;
     featureLayerGroupRef.current.clearLayers();
@@ -120,48 +139,78 @@ export const AerodromeMap: React.FC<AerodromeMapProps> = ({
       const isHighlighted = highlightedFeatureIds.includes(feat.id);
       const isSelected = selectedFeature?.id === feat.id;
 
-      // 1. RUNWAY SUBSYSTEM
-      if (feat.featureClass === 'RunwayElement' && layers.runways) {
+      // 1. RUNWAY ELEMENTS & SHOULDERS & MARKINGS
+      if (
+        ['RunwayElement', 'RunwayIntersection', 'RunwayMarking', 'RunwayShoulder'].includes(
+          feat.featureClass
+        ) &&
+        layers.runways
+      ) {
         if (Array.isArray(feat.coordinates) && Array.isArray(feat.coordinates[0])) {
-          const latLngs = (feat.coordinates as [number, number][]).map(([lat, lng]) => L.latLng(lat, lng));
+          const latLngs = (feat.coordinates as [number, number][]).map(([lat, lng]) =>
+            L.latLng(lat, lng)
+          );
           const polygon = L.polygon(latLngs, {
             color: isSelected ? '#38BDF8' : isHighlighted ? '#F43F5E' : '#FFFFFF',
             weight: isSelected || isHighlighted ? 3 : 1.5,
-            fillColor: '#1F2937',
+            fillColor: feat.featureClass === 'RunwayShoulder' ? '#334155' : '#1F2937',
             fillOpacity: 0.9,
           });
 
           polygon.bindTooltip(
             `<div class="font-mono text-xs font-bold text-white bg-slate-900 px-2 py-1 rounded border border-slate-700">
-              RWY ${feat.designator} · ${feat.properties?.pcnRating || 'PCN 100'}
+              ${feat.featureClass === 'RunwayElement' ? 'RWY ' : ''}${feat.designator}
             </div>`,
-            { permanent: false, direction: 'top', className: 'aero-tooltip' }
+            { permanent: false, direction: 'top' }
           );
 
           polygon.on('click', () => onSelectFeature(feat));
           polygon.addTo(featureLayerGroupRef.current!);
+        } else if (
+          feat.featureClass === 'RunwayCenterlinePoint' &&
+          Array.isArray(feat.coordinates) &&
+          typeof feat.coordinates[0] === 'number'
+        ) {
+          const coord = feat.coordinates as [number, number];
+          const pt = L.circleMarker([coord[0], coord[1]], {
+            radius: 3,
+            color: '#FFFFFF',
+            fillColor: '#FFFFFF',
+            fillOpacity: 1,
+            weight: 1,
+          });
+          pt.bindTooltip(`Centerline: ${feat.designator}`, { permanent: false });
+          pt.on('click', () => onSelectFeature(feat));
+          pt.addTo(featureLayerGroupRef.current!);
         }
       }
 
-      // Runway Thresholds
-      if (feat.featureClass === 'RunwayThreshold' && layers.thresholds) {
+      // Runway Thresholds & Displaced Thresholds
+      if (
+        ['RunwayThreshold', 'RunwayDisplacedThreshold'].includes(feat.featureClass) &&
+        layers.thresholds
+      ) {
         if (Array.isArray(feat.coordinates) && Array.isArray(feat.coordinates[0])) {
-          const latLngs = (feat.coordinates as [number, number][]).map(([lat, lng]) => L.latLng(lat, lng));
+          const latLngs = (feat.coordinates as [number, number][]).map(([lat, lng]) =>
+            L.latLng(lat, lng)
+          );
           const line = L.polyline(latLngs, {
-            color: '#10B981',
+            color: feat.featureClass === 'RunwayDisplacedThreshold' ? '#34D399' : '#10B981',
             weight: 5,
             opacity: 0.95,
           });
-          line.bindTooltip(`THR ${feat.designator}`, { permanent: false });
+          line.bindTooltip(`${feat.featureClass}: ${feat.designator}`, { permanent: false });
           line.on('click', () => onSelectFeature(feat));
           line.addTo(featureLayerGroupRef.current!);
         }
       }
 
-      // Blast Pads
-      if (feat.featureClass === 'RunwayBlastPad' && layers.blastPads) {
+      // Blast Pads, Stopways & Clearways
+      if (['RunwayBlastPad', 'Stopway', 'Clearway'].includes(feat.featureClass) && layers.blastPads) {
         if (Array.isArray(feat.coordinates) && Array.isArray(feat.coordinates[0])) {
-          const latLngs = (feat.coordinates as [number, number][]).map(([lat, lng]) => L.latLng(lat, lng));
+          const latLngs = (feat.coordinates as [number, number][]).map(([lat, lng]) =>
+            L.latLng(lat, lng)
+          );
           const poly = L.polygon(latLngs, {
             color: '#D97706',
             weight: 2,
@@ -169,37 +218,49 @@ export const AerodromeMap: React.FC<AerodromeMapProps> = ({
             fillColor: '#78350F',
             fillOpacity: 0.5,
           });
+          poly.bindTooltip(`${feat.featureClass}: ${feat.designator}`, { permanent: false });
           poly.on('click', () => onSelectFeature(feat));
           poly.addTo(featureLayerGroupRef.current!);
         }
       }
 
-      // 2. TAXIWAY SUBSYSTEM
-      if (feat.featureClass === 'TaxiwayElement' && layers.taxiways) {
+      // 2. TAXIWAY ELEMENTS, SHOULDERS & INTERSECTIONS
+      if (
+        ['TaxiwayElement', 'TaxiwayIntersection', 'TaxiwayShoulder', 'TaxiwayMarking'].includes(
+          feat.featureClass
+        ) &&
+        layers.taxiways
+      ) {
         if (Array.isArray(feat.coordinates) && Array.isArray(feat.coordinates[0])) {
-          const latLngs = (feat.coordinates as [number, number][]).map(([lat, lng]) => L.latLng(lat, lng));
+          const latLngs = (feat.coordinates as [number, number][]).map(([lat, lng]) =>
+            L.latLng(lat, lng)
+          );
           const poly = L.polygon(latLngs, {
             color: '#4B5563',
             weight: 1,
             fillColor: '#374151',
             fillOpacity: 0.65,
           });
+          poly.bindTooltip(`${feat.designator}`, { permanent: false });
           poly.on('click', () => onSelectFeature(feat));
           poly.addTo(featureLayerGroupRef.current!);
         }
       }
 
-      // Guidance Lines (TGL)
+      // Guidance Lines (TGL & Enhanced Centerlines)
       if (
-        (feat.featureClass === 'TaxiwayGuidanceLine' || feat.featureClass === 'StandGuidanceLine') &&
+        ['TaxiwayGuidanceLine', 'EnhancedTaxiwayCenterline'].includes(feat.featureClass) &&
         layers.guidanceLines
       ) {
         if (Array.isArray(feat.coordinates) && Array.isArray(feat.coordinates[0])) {
-          const latLngs = (feat.coordinates as [number, number][]).map(([lat, lng]) => L.latLng(lat, lng));
+          const latLngs = (feat.coordinates as [number, number][]).map(([lat, lng]) =>
+            L.latLng(lat, lng)
+          );
           const line = L.polyline(latLngs, {
             color: isSelected ? '#38BDF8' : '#F59E0B',
             weight: isSelected ? 3.5 : 2,
             opacity: 0.9,
+            dashArray: feat.featureClass === 'EnhancedTaxiwayCenterline' ? '6, 4' : undefined,
           });
           line.bindTooltip(`${feat.designator}`, { permanent: false });
           line.on('click', () => onSelectFeature(feat));
@@ -207,35 +268,51 @@ export const AerodromeMap: React.FC<AerodromeMapProps> = ({
         }
       }
 
-      // Hold Short Lines
-      if (feat.featureClass === 'RunwayHoldingPosition' && layers.holdingPositions) {
+      // Hold Short Lines & Hold Position Lights & RETIL
+      if (
+        [
+          'RunwayHoldingPosition',
+          'IntermediateHoldingPosition',
+          'TaxiwayHoldingPositionLight',
+          'RapidExitTaxiwayIndicator',
+        ].includes(feat.featureClass) &&
+        layers.holdingPositions
+      ) {
         const coord = Array.isArray(feat.coordinates[0])
           ? (feat.coordinates as [number, number][])[0]
           : (feat.coordinates as [number, number]);
 
+        const isRunwayHold = feat.featureClass === 'RunwayHoldingPosition';
         const marker = L.circleMarker([coord[0], coord[1]], {
-          radius: 6,
-          color: '#EF4444',
-          fillColor: '#B91C1C',
+          radius: isRunwayHold ? 6 : 5,
+          color: isRunwayHold ? '#EF4444' : '#F59E0B',
+          fillColor: isRunwayHold ? '#B91C1C' : '#D97706',
           fillOpacity: 0.9,
           weight: 2,
         });
-        marker.bindTooltip(`STOP: ${feat.designator}`, { permanent: false });
+        marker.bindTooltip(`${feat.featureClass}: ${feat.designator}`, { permanent: false });
         marker.on('click', () => onSelectFeature(feat));
         marker.addTo(featureLayerGroupRef.current!);
       }
 
-      // 3. APRONS & PARKING STANDS
-      if (feat.featureClass === 'ParkingStandArea' && layers.parkingStands) {
+      // 3. APRONS & PARKING STANDS & DEICING
+      if (
+        ['ParkingStandArea', 'ApronElement', 'ApronShoulder', 'DeicingArea'].includes(
+          feat.featureClass
+        ) &&
+        layers.parkingStands
+      ) {
         if (Array.isArray(feat.coordinates) && Array.isArray(feat.coordinates[0])) {
-          const latLngs = (feat.coordinates as [number, number][]).map(([lat, lng]) => L.latLng(lat, lng));
+          const latLngs = (feat.coordinates as [number, number][]).map(([lat, lng]) =>
+            L.latLng(lat, lng)
+          );
           const poly = L.polygon(latLngs, {
             color: isSelected ? '#38BDF8' : '#06B6D4',
             weight: 1.5,
-            fillColor: '#0891B2',
+            fillColor: feat.featureClass === 'DeicingArea' ? '#0284C7' : '#0891B2',
             fillOpacity: 0.35,
           });
-          poly.bindTooltip(`Stand ${feat.designator}`, { permanent: false });
+          poly.bindTooltip(`${feat.featureClass}: ${feat.designator}`, { permanent: false });
           poly.on('click', () => onSelectFeature(feat));
           poly.addTo(featureLayerGroupRef.current!);
         } else if (Array.isArray(feat.coordinates) && typeof feat.coordinates[0] === 'number') {
@@ -253,10 +330,50 @@ export const AerodromeMap: React.FC<AerodromeMapProps> = ({
         }
       }
 
+      // Stand Guidance Lines, Service Roads & Walkways
+      if (
+        ['StandGuidanceLine', 'ServiceRoad', 'PassengerWalkway'].includes(feat.featureClass) &&
+        layers.standGuidance
+      ) {
+        if (Array.isArray(feat.coordinates) && Array.isArray(feat.coordinates[0])) {
+          const latLngs = (feat.coordinates as [number, number][]).map(([lat, lng]) =>
+            L.latLng(lat, lng)
+          );
+          const line = L.polyline(latLngs, {
+            color: feat.featureClass === 'ServiceRoad' ? '#EAB308' : '#22D3EE',
+            weight: 2,
+            opacity: 0.85,
+            dashArray: feat.featureClass === 'ServiceRoad' ? '4, 4' : undefined,
+          });
+          line.bindTooltip(`${feat.featureClass}: ${feat.designator}`, { permanent: false });
+          line.on('click', () => onSelectFeature(feat));
+          line.addTo(featureLayerGroupRef.current!);
+        }
+      }
+
+      // Passenger Boarding Bridges (PBB Jet Bridges)
+      if (feat.featureClass === 'PassengerBoardingBridge' && layers.jetBridges) {
+        if (Array.isArray(feat.coordinates) && Array.isArray(feat.coordinates[0])) {
+          const latLngs = (feat.coordinates as [number, number][]).map(([lat, lng]) =>
+            L.latLng(lat, lng)
+          );
+          const line = L.polyline(latLngs, {
+            color: '#818CF8',
+            weight: 4,
+            opacity: 0.9,
+          });
+          line.bindTooltip(`Jet Bridge: ${feat.designator}`, { permanent: false });
+          line.on('click', () => onSelectFeature(feat));
+          line.addTo(featureLayerGroupRef.current!);
+        }
+      }
+
       // 4. SAFETY HOT SPOTS
       if (feat.featureClass === 'HotSpot' && layers.hotspots) {
         if (Array.isArray(feat.coordinates) && Array.isArray(feat.coordinates[0])) {
-          const latLngs = (feat.coordinates as [number, number][]).map(([lat, lng]) => L.latLng(lat, lng));
+          const latLngs = (feat.coordinates as [number, number][]).map(([lat, lng]) =>
+            L.latLng(lat, lng)
+          );
           const poly = L.polygon(latLngs, {
             color: '#EF4444',
             weight: 2,
@@ -276,10 +393,21 @@ export const AerodromeMap: React.FC<AerodromeMapProps> = ({
         }
       }
 
-      // Runway Safety Area
-      if (feat.featureClass === 'RunwaySafetyArea' && layers.safetyAreas) {
+      // Runway Safety Area (RSA), RESA, OFA, OFZ
+      if (
+        [
+          'RunwaySafetyArea',
+          'RunwayEndSafetyArea',
+          'ObjectFreeArea',
+          'ObstacleFreeZone',
+          'LowVisibilityRoutingLine',
+        ].includes(feat.featureClass) &&
+        layers.safetyAreas
+      ) {
         if (Array.isArray(feat.coordinates) && Array.isArray(feat.coordinates[0])) {
-          const latLngs = (feat.coordinates as [number, number][]).map(([lat, lng]) => L.latLng(lat, lng));
+          const latLngs = (feat.coordinates as [number, number][]).map(([lat, lng]) =>
+            L.latLng(lat, lng)
+          );
           const poly = L.polygon(latLngs, {
             color: '#F97316',
             weight: 1,
@@ -287,63 +415,110 @@ export const AerodromeMap: React.FC<AerodromeMapProps> = ({
             fillColor: '#EA580C',
             fillOpacity: 0.15,
           });
+          poly.bindTooltip(`${feat.featureClass}: ${feat.designator}`, { permanent: false });
           poly.on('click', () => onSelectFeature(feat));
           poly.addTo(featureLayerGroupRef.current!);
         }
       }
 
-      // 5. VERTICAL STRUCTURES & OBSTACLES
-      if (feat.featureClass === 'VerticalStructure' && layers.obstacles) {
-        const coord = feat.coordinates as [number, number];
-        const height = feat.properties?.heightAglMeters || 50;
+      // 5. VERTICAL STRUCTURES & OBSTACLES (Point, Line, Polygon)
+      if (
+        ['VerticalStructure', 'VerticalStructureLine', 'VerticalStructurePolygon'].includes(
+          feat.featureClass
+        ) &&
+        layers.obstacles
+      ) {
+        if (
+          feat.featureClass === 'VerticalStructurePolygon' &&
+          Array.isArray(feat.coordinates) &&
+          Array.isArray(feat.coordinates[0])
+        ) {
+          const latLngs = (feat.coordinates as [number, number][]).map(([lat, lng]) =>
+            L.latLng(lat, lng)
+          );
+          const poly = L.polygon(latLngs, {
+            color: '#A855F7',
+            weight: 2,
+            fillColor: '#7E22CE',
+            fillOpacity: 0.45,
+          });
+          poly.bindTooltip(`Building: ${feat.designator}`, { permanent: false });
+          poly.on('click', () => onSelectFeature(feat));
+          poly.addTo(featureLayerGroupRef.current!);
+        } else if (
+          feat.featureClass === 'VerticalStructureLine' &&
+          Array.isArray(feat.coordinates) &&
+          Array.isArray(feat.coordinates[0])
+        ) {
+          const latLngs = (feat.coordinates as [number, number][]).map(([lat, lng]) =>
+            L.latLng(lat, lng)
+          );
+          const line = L.polyline(latLngs, {
+            color: '#C084FC',
+            weight: 2.5,
+            dashArray: '5, 5',
+          });
+          line.bindTooltip(`Barrier: ${feat.designator}`, { permanent: false });
+          line.on('click', () => onSelectFeature(feat));
+          line.addTo(featureLayerGroupRef.current!);
+        } else if (Array.isArray(feat.coordinates) && typeof feat.coordinates[0] === 'number') {
+          const coord = feat.coordinates as [number, number];
+          const height = feat.properties?.heightAglMeters || 50;
 
-        const iconHtml = `
-          <div class="flex items-center justify-center w-6 h-6 rounded-full bg-purple-600/90 border-2 border-purple-200 shadow-md text-[9px] font-mono text-white font-bold cursor-pointer">
-            ▲
-          </div>`;
+          const iconHtml = `
+            <div class="flex items-center justify-center w-6 h-6 rounded-full bg-purple-600/90 border-2 border-purple-200 shadow-md text-[9px] font-mono text-white font-bold cursor-pointer">
+              ▲
+            </div>`;
 
-        const customIcon = L.divIcon({
-          html: iconHtml,
-          className: 'custom-obstacle-icon',
-          iconSize: [24, 24],
-          iconAnchor: [12, 12],
-        });
+          const customIcon = L.divIcon({
+            html: iconHtml,
+            className: 'custom-obstacle-icon',
+            iconSize: [24, 24],
+            iconAnchor: [12, 12],
+          });
 
-        const marker = L.marker([coord[0], coord[1]], { icon: customIcon });
-        marker.bindTooltip(
-          `<div class="bg-slate-900 text-slate-100 border border-purple-800 p-2 text-xs font-mono rounded">
-            <span class="text-purple-400 font-bold">${feat.designator}</span>
-            <div class="text-[11px] text-slate-300">Height: ${height}m AGL</div>
-          </div>`,
-          { permanent: false }
-        );
-        marker.on('click', () => onSelectFeature(feat));
-        marker.addTo(featureLayerGroupRef.current!);
+          const marker = L.marker([coord[0], coord[1]], { icon: customIcon });
+          marker.bindTooltip(
+            `<div class="bg-slate-900 text-slate-100 border border-purple-800 p-2 text-xs font-mono rounded">
+              <span class="text-purple-400 font-bold">${feat.designator}</span>
+              <div class="text-[11px] text-slate-300">Height: ${height}m AGL</div>
+            </div>`,
+            { permanent: false }
+          );
+          marker.on('click', () => onSelectFeature(feat));
+          marker.addTo(featureLayerGroupRef.current!);
+        }
       }
 
-      // 6. NAVAIDS
+      // 6. VISUAL AIDS & RADIO NAVAIDS
       if (
         [
           'AerodromeReferencePoint',
           'WindDirectionIndicator',
           'VisualGlideSlopeIndicator',
+          'AirportBeacon',
+          'InstrumentLandingSystemComponent',
+          'RadarSurveillanceSensor',
           'LocalizerAntenna',
           'GlidePathAntenna',
+          'DistanceMeasuringEquipment',
           'AirportSurveillanceRadar',
         ].includes(feat.featureClass) &&
         layers.navaids
       ) {
-        const coord = feat.coordinates as [number, number];
-        const marker = L.circleMarker([coord[0], coord[1]], {
-          radius: 5,
-          color: '#10B981',
-          fillColor: '#059669',
-          fillOpacity: 0.9,
-          weight: 1.5,
-        });
-        marker.bindTooltip(`${feat.featureClass}: ${feat.designator}`, { permanent: false });
-        marker.on('click', () => onSelectFeature(feat));
-        marker.addTo(featureLayerGroupRef.current!);
+        if (Array.isArray(feat.coordinates) && typeof feat.coordinates[0] === 'number') {
+          const coord = feat.coordinates as [number, number];
+          const marker = L.circleMarker([coord[0], coord[1]], {
+            radius: 5,
+            color: '#10B981',
+            fillColor: '#059669',
+            fillOpacity: 0.9,
+            weight: 1.5,
+          });
+          marker.bindTooltip(`${feat.featureClass}: ${feat.designator}`, { permanent: false });
+          marker.on('click', () => onSelectFeature(feat));
+          marker.addTo(featureLayerGroupRef.current!);
+        }
       }
     });
   }, [dataset, layers, highlightedFeatureIds, selectedFeature]);
@@ -416,7 +591,7 @@ export const AerodromeMap: React.FC<AerodromeMapProps> = ({
           <button
             key={type}
             onClick={() => setBaseMap(type)}
-            className={`px-2.5 py-1 rounded text-xs transition-colors ${
+            className={`px-2.5 py-1 rounded text-xs transition-colors cursor-pointer ${
               baseMap === type
                 ? 'bg-sky-600 text-white font-semibold shadow-sm'
                 : 'text-slate-400 hover:text-slate-200'
@@ -432,21 +607,21 @@ export const AerodromeMap: React.FC<AerodromeMapProps> = ({
         <div className="bg-slate-900/90 backdrop-blur-md border border-slate-800 rounded-lg p-1.5 shadow-lg flex flex-col gap-1">
           <button
             onClick={handleZoomIn}
-            className="w-8 h-8 flex items-center justify-center text-slate-300 hover:text-white hover:bg-slate-800 rounded transition-colors"
+            className="w-8 h-8 flex items-center justify-center text-slate-300 hover:text-white hover:bg-slate-800 rounded transition-colors cursor-pointer"
             title="Zoom In"
           >
             <ZoomIn className="w-4 h-4" />
           </button>
           <button
             onClick={handleZoomOut}
-            className="w-8 h-8 flex items-center justify-center text-slate-300 hover:text-white hover:bg-slate-800 rounded transition-colors"
+            className="w-8 h-8 flex items-center justify-center text-slate-300 hover:text-white hover:bg-slate-800 rounded transition-colors cursor-pointer"
             title="Zoom Out"
           >
             <ZoomOut className="w-4 h-4" />
           </button>
           <button
             onClick={handleResetView}
-            className="w-8 h-8 flex items-center justify-center text-slate-300 hover:text-white hover:bg-slate-800 rounded transition-colors"
+            className="w-8 h-8 flex items-center justify-center text-slate-300 hover:text-white hover:bg-slate-800 rounded transition-colors cursor-pointer"
             title="Reset to Aerodrome Center"
           >
             <Compass className="w-4 h-4" />

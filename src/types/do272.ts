@@ -4,7 +4,7 @@
  */
 
 export type DO272FeatureClass =
-  // 1. Runway System
+  // 1. Runway System (10)
   | 'RunwayElement'
   | 'RunwayThreshold'
   | 'RunwayDisplacedThreshold'
@@ -14,7 +14,8 @@ export type DO272FeatureClass =
   | 'RunwayShoulder'
   | 'RunwayIntersection'
   | 'RunwayMarking'
-  // 2. Taxiway System
+  | 'RunwayCenterlinePoint'
+  // 2. Taxiway System (10)
   | 'TaxiwayElement'
   | 'TaxiwayGuidanceLine'
   | 'TaxiwayIntersection'
@@ -23,7 +24,9 @@ export type DO272FeatureClass =
   | 'IntermediateHoldingPosition'
   | 'TaxiwayHoldingPositionLight'
   | 'EnhancedTaxiwayCenterline'
-  // 3. Apron & Parking System
+  | 'TaxiwayMarking'
+  | 'RapidExitTaxiwayIndicator'
+  // 3. Apron & Parking System (9)
   | 'ApronElement'
   | 'ApronShoulder'
   | 'ParkingStandArea'
@@ -33,19 +36,26 @@ export type DO272FeatureClass =
   | 'DeicingArea'
   | 'ServiceRoad'
   | 'PassengerWalkway'
-  // 4. Safety & Protection Surfaces
+  // 4. Safety & Protection Surfaces (5)
   | 'HotSpot'
   | 'RunwaySafetyArea'
   | 'RunwayEndSafetyArea'
   | 'ObjectFreeArea'
   | 'ObstacleFreeZone'
   | 'LowVisibilityRoutingLine'
-  // 5. Vertical Structures & Obstacles
+  // 5. Vertical Structures & Obstacles (3)
   | 'VerticalStructure'
-  // 6. Aeronautical Ground Lighting & NAVAIDs
-  | 'AerodromeReferencePoint'
-  | 'WindDirectionIndicator'
+  | 'VerticalStructureLine'
+  | 'VerticalStructurePolygon'
+  // 6. Aeronautical Ground Lighting & Visual Aids (4)
   | 'VisualGlideSlopeIndicator'
+  | 'WindDirectionIndicator'
+  | 'AerodromeReferencePoint'
+  | 'AirportBeacon'
+  // 7. Radio NAVAIDs & Radar Surveillance (2)
+  | 'InstrumentLandingSystemComponent'
+  | 'RadarSurveillanceSensor'
+  // Legacy / Concrete Sensor Aliases
   | 'LocalizerAntenna'
   | 'GlidePathAntenna'
   | 'DistanceMeasuringEquipment'
@@ -87,14 +97,15 @@ export interface RunwayFeature extends BaseDO272Feature {
     | 'RunwayBlastPad'
     | 'RunwayShoulder'
     | 'RunwayIntersection'
-    | 'RunwayMarking';
-  lengthMeters: number;
-  widthMeters: number;
-  trueHeading: number;
-  surface: SurfaceMaterial;
-  pcnRating: string; // e.g., "112/R/B/W/T"
+    | 'RunwayMarking'
+    | 'RunwayCenterlinePoint';
+  lengthMeters?: number;
+  widthMeters?: number;
+  trueHeading?: number;
+  surface?: SurfaceMaterial;
+  pcnRating?: string; // e.g., "112/R/B/W/T"
   ilsCat?: string; // e.g., "CAT IIIb"
-  coordinates: [number, number][]; // GeoJSON polygon coordinates [lat, lng]
+  coordinates: [number, number][] | [number, number]; // GeoJSON polygon, line, or point
 }
 
 export interface TaxiwayFeature extends BaseDO272Feature {
@@ -106,7 +117,9 @@ export interface TaxiwayFeature extends BaseDO272Feature {
     | 'RunwayHoldingPosition'
     | 'IntermediateHoldingPosition'
     | 'TaxiwayHoldingPositionLight'
-    | 'EnhancedTaxiwayCenterline';
+    | 'EnhancedTaxiwayCenterline'
+    | 'TaxiwayMarking'
+    | 'RapidExitTaxiwayIndicator';
   widthMeters?: number;
   surface?: SurfaceMaterial;
   maxWingspanMeters?: number;
@@ -128,6 +141,8 @@ export interface ParkingStandFeature extends BaseDO272Feature {
     | 'PassengerWalkway';
   standNumber?: string;
   terminal?: string;
+  surface?: SurfaceMaterial;
+  pcnRating?: string;
   icaoCodeLetter?: ICAOCodeLetter; // Max aircraft size
   hasJetBridge?: boolean;
   coordinates: [number, number][] | [number, number];
@@ -141,15 +156,17 @@ export interface SafetyAreaFeature extends BaseDO272Feature {
     | 'ObjectFreeArea'
     | 'ObstacleFreeZone'
     | 'LowVisibilityRoutingLine';
+  lengthMeters?: number;
+  widthMeters?: number;
   hotspotSeverity?: 'High' | 'Medium' | 'Low';
   hazardDescription?: string;
   associatedRunway?: string;
-  coordinates: [number, number][];
+  coordinates: [number, number][] | [number, number];
 }
 
 export interface VerticalStructureFeature extends BaseDO272Feature {
-  featureClass: 'VerticalStructure';
-  structureType:
+  featureClass: 'VerticalStructure' | 'VerticalStructureLine' | 'VerticalStructurePolygon';
+  structureType?:
     | 'Control Tower'
     | 'Passenger Terminal'
     | 'Hangar'
@@ -157,14 +174,17 @@ export interface VerticalStructureFeature extends BaseDO272Feature {
     | 'Antenna Mast'
     | 'Light Pole'
     | 'NAVAID Shelter'
-    | 'Construction Crane';
-  heightAglMeters: number; // Height Above Ground Level
-  elevationAmslMeters: number; // Elevation Above Mean Sea Level
-  frangible: boolean;
-  lightingType: 'High-Intensity White' | 'Medium Red Strobe' | 'Steady Red' | 'Floodlit' | 'Unlit';
+    | 'Construction Crane'
+    | 'Perimeter Fence'
+    | 'Blast Fence'
+    | 'Terminal Building';
+  heightAglMeters?: number; // Height Above Ground Level
+  elevationAmslMeters?: number; // Elevation Above Mean Sea Level
+  frangible?: boolean;
+  lightingType?: 'High-Intensity White' | 'Medium Red Strobe' | 'Steady Red' | 'Floodlit' | 'Unlit';
   penetratesPart77?: boolean; // Evaluated dynamically
   clearanceMarginMeters?: number;
-  coordinates: [number, number]; // [lat, lng]
+  coordinates: [number, number] | [number, number][]; // Point, LineString, or Polygon
 }
 
 export interface NAVAIDFeature extends BaseDO272Feature {
@@ -172,6 +192,9 @@ export interface NAVAIDFeature extends BaseDO272Feature {
     | 'AerodromeReferencePoint'
     | 'WindDirectionIndicator'
     | 'VisualGlideSlopeIndicator'
+    | 'AirportBeacon'
+    | 'InstrumentLandingSystemComponent'
+    | 'RadarSurveillanceSensor'
     | 'LocalizerAntenna'
     | 'GlidePathAntenna'
     | 'DistanceMeasuringEquipment'

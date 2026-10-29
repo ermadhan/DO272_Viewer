@@ -18,12 +18,14 @@ import { SpatialAnalysisHUD } from './components/SpatialAnalysisHUD';
 import { MCPStudio } from './components/MCPStudio';
 import { WindowsSetupModal } from './components/WindowsSetupModal';
 import { DataIngestModal } from './components/DataIngestModal';
+import { DO272CatalogueModal } from './components/DO272CatalogueModal';
+import { DO272FeatureExplorer } from './components/DO272FeatureExplorer';
 import { DatabaseEngine } from './services/databaseSchema';
 import { Loader2, RefreshCw } from 'lucide-react';
 
 export default function App() {
   // Navigation & View State
-  const [activeTab, setActiveTab] = useState<'map' | 'routing' | 'obstacles' | 'sql' | 'mcp' | 'windows'>('map');
+  const [activeTab, setActiveTab] = useState<'map' | 'features' | 'routing' | 'obstacles' | 'sql' | 'mcp' | 'windows'>('map');
   const [databaseEngine, setDatabaseEngine] = useState<DatabaseEngine>('postgres');
   const [isFetchingLiveOsm, setIsFetchingLiveOsm] = useState<boolean>(false);
   const [selectedIcao, setSelectedIcao] = useState<string>('KSFO');
@@ -59,6 +61,7 @@ export default function App() {
   // Modals
   const [isIngestOpen, setIsIngestOpen] = useState(false);
   const [isWindowsGuideOpen, setIsWindowsGuideOpen] = useState(false);
+  const [isCatalogueOpen, setIsCatalogueOpen] = useState(false);
 
   // Dynamic Feature Counts per Subsystem
   const featureCounts = useMemo(() => {
@@ -126,6 +129,7 @@ export default function App() {
         onToggleDatabaseEngine={setDatabaseEngine}
         onOpenIngest={() => setIsIngestOpen(true)}
         onOpenWindowsGuide={() => setIsWindowsGuideOpen(true)}
+        onOpenCatalogue={() => setIsCatalogueOpen(true)}
       />
 
       {/* Aerodrome Overview Kicker Banner */}
@@ -174,58 +178,74 @@ export default function App() {
 
       {/* Main Viewport Workspace */}
       <div className="relative flex-1 w-full h-full overflow-hidden flex">
-        {/* Primary Leaflet Map Container */}
-        <div className="relative flex-1 h-full w-full">
-          <AerodromeMap
+        {activeTab === 'features' ? (
+          <DO272FeatureExplorer
             dataset={currentDataset}
-            layers={layers}
-            activeRoute={activeRoute}
+            databaseEngine={databaseEngine}
             selectedFeature={selectedFeature}
             onSelectFeature={(feat) => setSelectedFeature(feat)}
-            highlightedFeatureIds={highlightedFeatureIds}
+            onNavigateToMap={(feat) => {
+              if (feat) setSelectedFeature(feat);
+              setActiveTab('map');
+            }}
           />
-
-          {/* Floating Left: Subsystem Layer Controls (Only in map or routing view) */}
-          {(activeTab === 'map' || activeTab === 'routing') && (
-            <div className="absolute top-16 left-4 z-20">
-              <LayerControls
+        ) : (
+          <>
+            {/* Primary Leaflet Map Container */}
+            <div className="relative flex-1 h-full w-full">
+              <AerodromeMap
+                dataset={currentDataset}
                 layers={layers}
-                setLayers={setLayers}
-                featureCounts={featureCounts}
+                activeRoute={activeRoute}
+                selectedFeature={selectedFeature}
+                onSelectFeature={(feat) => setSelectedFeature(feat)}
+                highlightedFeatureIds={highlightedFeatureIds}
               />
+
+              {/* Floating Left: Subsystem Layer Controls (Only in map or routing view) */}
+              {(activeTab === 'map' || activeTab === 'routing') && (
+                <div className="absolute top-16 left-4 z-20">
+                  <LayerControls
+                    layers={layers}
+                    setLayers={setLayers}
+                    featureCounts={featureCounts}
+                    onOpenExplorer={() => setActiveTab('features')}
+                  />
+                </div>
+              )}
+
+              {/* Floating Right: Feature Inspector */}
+              {selectedFeature && (
+                <div className="absolute top-4 right-4 z-20">
+                  <FeatureInspector
+                    feature={selectedFeature}
+                    onClose={() => setSelectedFeature(null)}
+                  />
+                </div>
+              )}
             </div>
-          )}
 
-          {/* Floating Right: Feature Inspector */}
-          {selectedFeature && (
-            <div className="absolute top-4 right-4 z-20">
-              <FeatureInspector
-                feature={selectedFeature}
-                onClose={() => setSelectedFeature(null)}
-              />
-            </div>
-          )}
-        </div>
+            {/* Spatial Analysis & PostGIS Engine HUD Drawer */}
+            {(activeTab === 'routing' || activeTab === 'obstacles' || activeTab === 'sql') && (
+              <div className="w-[520px] h-full z-30 p-3 bg-slate-950/90 backdrop-blur-md border-l border-slate-800 shadow-2xl flex flex-col">
+                <SpatialAnalysisHUD
+                  dataset={currentDataset}
+                  activeRoute={activeRoute}
+                  setActiveRoute={setActiveRoute}
+                  onHighlightFeatures={(ids) => setHighlightedFeatureIds(ids)}
+                  databaseEngine={databaseEngine}
+                  onToggleDatabaseEngine={setDatabaseEngine}
+                />
+              </div>
+            )}
 
-        {/* Spatial Analysis & PostGIS Engine HUD Drawer */}
-        {(activeTab === 'routing' || activeTab === 'obstacles' || activeTab === 'sql') && (
-          <div className="w-[520px] h-full z-30 p-3 bg-slate-950/90 backdrop-blur-md border-l border-slate-800 shadow-2xl flex flex-col">
-            <SpatialAnalysisHUD
-              dataset={currentDataset}
-              activeRoute={activeRoute}
-              setActiveRoute={setActiveRoute}
-              onHighlightFeatures={(ids) => setHighlightedFeatureIds(ids)}
-              databaseEngine={databaseEngine}
-              onToggleDatabaseEngine={setDatabaseEngine}
-            />
-          </div>
-        )}
-
-        {/* Model Context Protocol (MCP) Studio Drawer */}
-        {activeTab === 'mcp' && (
-          <div className="w-[640px] h-full z-30 p-3 bg-slate-950/90 backdrop-blur-md border-l border-slate-800 shadow-2xl flex flex-col">
-            <MCPStudio dataset={currentDataset} />
-          </div>
+            {/* Model Context Protocol (MCP) Studio Drawer */}
+            {activeTab === 'mcp' && (
+              <div className="w-[640px] h-full z-30 p-3 bg-slate-950/90 backdrop-blur-md border-l border-slate-800 shadow-2xl flex flex-col">
+                <MCPStudio dataset={currentDataset} />
+              </div>
+            )}
+          </>
         )}
       </div>
 
@@ -239,6 +259,11 @@ export default function App() {
         isOpen={isIngestOpen}
         onClose={() => setIsIngestOpen(false)}
         onDatasetLoaded={handleDatasetLoaded}
+      />
+
+      <DO272CatalogueModal
+        isOpen={isCatalogueOpen}
+        onClose={() => setIsCatalogueOpen(false)}
       />
     </div>
   );

@@ -166,9 +166,15 @@ export function evaluateObstacleClearances(dataset: AerodromeDataset): ObstacleC
     let minDistance = Infinity;
     let nearestRwyName = '28L';
 
+    const obsCoord: [number, number] = Array.isArray(obs.coordinates[0])
+      ? (obs.coordinates as [number, number][])[0]
+      : (obs.coordinates as [number, number]);
+
     for (const rwy of runways) {
-      const rwyCenter = rwy.coordinates[0];
-      const dist = haversineDistanceMeters(obs.coordinates, rwyCenter);
+      const rwyCenter: [number, number] = Array.isArray(rwy.coordinates[0])
+        ? (rwy.coordinates as [number, number][])[0]
+        : (rwy.coordinates as [number, number]);
+      const dist = haversineDistanceMeters(obsCoord, rwyCenter);
       if (dist < minDistance) {
         minDistance = dist;
         nearestRwyName = rwy.designator;
@@ -195,16 +201,19 @@ export function evaluateObstacleClearances(dataset: AerodromeDataset): ObstacleC
       allowedMaxElevationAmsl = dataset.elevationMeters + 45.0 + ((minDistance - 4000) * 0.05);
     }
 
-    const isPenetrating = obs.elevationAmslMeters > allowedMaxElevationAmsl;
+    const obsElev = obs.elevationAmslMeters || (obs.heightAglMeters ? obs.heightAglMeters + dataset.elevationMeters : dataset.elevationMeters);
+    const obsHeight = obs.heightAglMeters || 30;
+
+    const isPenetrating = obsElev > allowedMaxElevationAmsl;
     const penetrationMeters = isPenetrating
-      ? Math.round((obs.elevationAmslMeters - allowedMaxElevationAmsl) * 10) / 10
+      ? Math.round((obsElev - allowedMaxElevationAmsl) * 10) / 10
       : 0;
 
     results.push({
       structureId: obs.id,
       structureName: obs.designator,
-      heightAgl: obs.heightAglMeters,
-      elevationAmsl: obs.elevationAmslMeters,
+      heightAgl: obsHeight,
+      elevationAmsl: obsElev,
       distanceToNearestRunwayMeters: Math.round(minDistance),
       nearestRunway: nearestRwyName,
       applicableSurface: surface,
@@ -249,16 +258,20 @@ export function executeSpatialSql(
     columns = ['runway_id', 'designator', 'length_m', 'width_m', 'surface', 'pcn_rating'];
     const rwys = dataset.features.filter((f): f is RunwayFeature => f.featureClass === 'RunwayElement');
     for (const r of rwys) {
-      if (lowerSql.includes('> 3000') && r.lengthMeters <= 3000) continue;
-      rows.push([r.id, r.designator, r.lengthMeters, r.widthMeters, r.surface, r.pcnRating]);
+      const len = r.lengthMeters || 0;
+      const wid = r.widthMeters || 0;
+      if (lowerSql.includes('> 3000') && len <= 3000) continue;
+      rows.push([r.id, r.designator, len, wid, r.surface || 'Asphalt', r.pcnRating || 'PCN 100']);
       affectedFeatureIds.push(r.id);
     }
   } else if (lowerSql.includes('do272_obstacles') || lowerSql.includes('vertical_structures') || lowerSql.includes('st_distance')) {
     columns = ['structure_id', 'structure_name', 'height_agl_m', 'elevation_amsl_m', 'frangible', 'lighting'];
     const obstacles = dataset.features.filter((f): f is VerticalStructureFeature => f.featureClass === 'VerticalStructure');
     for (const o of obstacles) {
-      if (lowerSql.includes('> 50') && o.heightAglMeters <= 50) continue;
-      rows.push([o.id, o.designator, o.heightAglMeters, o.elevationAmslMeters, o.frangible ? 'YES' : 'NO', o.lightingType]);
+      const hAgl = o.heightAglMeters || 0;
+      const elev = o.elevationAmslMeters || (hAgl + dataset.elevationMeters);
+      if (lowerSql.includes('> 50') && hAgl <= 50) continue;
+      rows.push([o.id, o.designator, hAgl, elev, o.frangible ? 'YES' : 'NO', o.lightingType || 'Unlit']);
       affectedFeatureIds.push(o.id);
     }
   } else if (lowerSql.includes('st_buffer') || lowerSql.includes('hotspot') || lowerSql.includes('hot_spot')) {
@@ -420,7 +433,10 @@ export function validateDO272Compliance(
     let minRwyDist = Infinity;
     let closestRwy = 'Unknown';
     for (const rwy of runways) {
-      const dist = haversineDistanceMeters(hpCoord, rwy.coordinates[0]);
+      const rwyCenter: [number, number] = Array.isArray(rwy.coordinates[0])
+        ? (rwy.coordinates as [number, number][])[0]
+        : (rwy.coordinates as [number, number]);
+      const dist = haversineDistanceMeters(hpCoord, rwyCenter);
       if (dist < minRwyDist) {
         minRwyDist = dist;
         closestRwy = rwy.designator;
@@ -492,9 +508,16 @@ export function validateDO272Compliance(
   const obstacles = dataset.features.filter((f): f is VerticalStructureFeature => f.featureClass === 'VerticalStructure');
   for (const obs of obstacles) {
     totalChecks++;
+    const obsCoord: [number, number] = Array.isArray(obs.coordinates[0])
+      ? (obs.coordinates as [number, number][])[0]
+      : (obs.coordinates as [number, number]);
+
     let distToRwy = Infinity;
     for (const rwy of runways) {
-      const d = haversineDistanceMeters(obs.coordinates, rwy.coordinates[0]);
+      const rwyCoord: [number, number] = Array.isArray(rwy.coordinates[0])
+        ? (rwy.coordinates as [number, number][])[0]
+        : (rwy.coordinates as [number, number]);
+      const d = haversineDistanceMeters(obsCoord, rwyCoord);
       if (d < distToRwy) distToRwy = d;
     }
 
@@ -506,7 +529,7 @@ export function validateDO272Compliance(
         featureId: obs.id,
         featureClass: 'VerticalStructure',
         severity: 'CRITICAL',
-        description: `Non-frangible structure "${obs.designator}" (height ${obs.heightAglMeters}m) located only ${Math.round(distToRwy)}m from runway centerline.`,
+        description: `Non-frangible structure "${obs.designator}" (height ${obs.heightAglMeters || 30}m) located only ${Math.round(distToRwy)}m from runway centerline.`,
         recommendedFix: 'Verify obstacle frangibility certification or establish obstacle-free zone waiver.',
       });
     } else {

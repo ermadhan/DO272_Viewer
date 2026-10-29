@@ -1,16 +1,17 @@
 import React from 'react';
-import { Database, Download, Terminal, Plane, Compass, ShieldAlert, Cpu } from 'lucide-react';
+import { Database, Download, Terminal, Plane, Compass, ShieldAlert, Cpu, BookOpen, Layers } from 'lucide-react';
 import { DatabaseEngine } from '../services/databaseSchema';
 
 interface HeaderProps {
-  activeTab: 'map' | 'routing' | 'obstacles' | 'sql' | 'mcp' | 'windows';
-  setActiveTab: (tab: 'map' | 'routing' | 'obstacles' | 'sql' | 'mcp' | 'windows') => void;
+  activeTab: 'map' | 'features' | 'routing' | 'obstacles' | 'sql' | 'mcp' | 'windows';
+  setActiveTab: (tab: 'map' | 'features' | 'routing' | 'obstacles' | 'sql' | 'mcp' | 'windows') => void;
   selectedIcao: string;
   onSelectIcao: (icao: string) => void;
   databaseEngine: DatabaseEngine;
   onToggleDatabaseEngine: (engine: DatabaseEngine) => void;
   onOpenIngest: () => void;
   onOpenWindowsGuide: () => void;
+  onOpenCatalogue: () => void;
 }
 
 export const Header: React.FC<HeaderProps> = ({
@@ -22,6 +23,7 @@ export const Header: React.FC<HeaderProps> = ({
   onToggleDatabaseEngine,
   onOpenIngest,
   onOpenWindowsGuide,
+  onOpenCatalogue,
 }) => {
   return (
     <header className="flex items-center justify-between gap-8 px-6 py-3.5 bg-slate-950 border-b border-slate-800 text-slate-100 select-none">
@@ -76,7 +78,7 @@ export const Header: React.FC<HeaderProps> = ({
       <nav className="hidden lg:flex items-center gap-1 bg-slate-900/80 p-1 rounded-lg border border-slate-800 text-sm font-medium">
         <button
           onClick={() => setActiveTab('map')}
-          className={`flex items-center gap-2 px-3.5 py-1.5 rounded-md text-xs transition-colors whitespace-nowrap ${
+          className={`flex items-center gap-2 px-3.5 py-1.5 rounded-md text-xs transition-colors whitespace-nowrap cursor-pointer ${
             activeTab === 'map'
               ? 'bg-slate-800 text-white shadow-sm font-semibold'
               : 'text-slate-400 hover:text-slate-200'
@@ -84,6 +86,18 @@ export const Header: React.FC<HeaderProps> = ({
         >
           <Compass className="w-3.5 h-3.5 text-sky-400" />
           Interactive Map
+        </button>
+        <button
+          onClick={() => setActiveTab('features')}
+          className={`flex items-center gap-2 px-3.5 py-1.5 rounded-md text-xs transition-colors whitespace-nowrap cursor-pointer ${
+            activeTab === 'features'
+              ? 'bg-slate-800 text-white shadow-sm font-semibold'
+              : 'text-slate-400 hover:text-slate-200'
+          }`}
+          title="Browse, filter, and search all DO-272 features"
+        >
+          <Layers className="w-3.5 h-3.5 text-sky-400" />
+          DO-272 Features
         </button>
         <button
           onClick={() => setActiveTab('routing')}
@@ -130,8 +144,16 @@ export const Header: React.FC<HeaderProps> = ({
           MCP Studio
         </button>
         <button
+          onClick={onOpenCatalogue}
+          className="flex items-center gap-2 px-3.5 py-1.5 rounded-md text-xs transition-colors whitespace-nowrap text-slate-400 hover:text-white hover:bg-slate-800/80 cursor-pointer"
+          title="View RTCA DO-272 / ED-99 standard 43 feature data dictionary"
+        >
+          <BookOpen className="w-3.5 h-3.5 text-sky-400" />
+          DO-272 43 Features
+        </button>
+        <button
           onClick={() => onOpenWindowsGuide()}
-          className="flex items-center gap-2 px-3.5 py-1.5 rounded-md text-xs transition-colors whitespace-nowrap text-slate-400 hover:text-slate-200"
+          className="flex items-center gap-2 px-3.5 py-1.5 rounded-md text-xs transition-colors whitespace-nowrap text-slate-400 hover:text-slate-200 cursor-pointer"
         >
           <Terminal className="w-3.5 h-3.5 text-indigo-400" />
           Windows Setup

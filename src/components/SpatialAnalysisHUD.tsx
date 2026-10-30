@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import {
   AerodromeDataset,
   TaxiRouteResult,
@@ -51,9 +51,21 @@ export const SpatialAnalysisHUD: React.FC<SpatialAnalysisHUDProps> = ({
 }) => {
   const [activeTab, setActiveTab] = useState<'routing' | 'obstacles' | 'sql' | 'schema'>('routing');
 
+  // Find routing origins (exits/guidance lines) and destinations (parking stands)
+  const originOptions = dataset.features.filter(
+    (f) =>
+      f.featureClass === 'TaxiwayGuidanceLine' ||
+      f.featureClass === 'RunwayThreshold' ||
+      f.featureClass === 'RunwayHoldingPosition'
+  );
+
+  const destinationOptions = dataset.features.filter(
+    (f) => f.featureClass === 'ParkingStandArea'
+  );
+
   // Ground Routing State
-  const [originKey, setOriginKey] = useState<string>('SFO-TGL-EXIT-28L-F');
-  const [destinationKey, setDestinationKey] = useState<string>('SFO-STAND-A6');
+  const [originKey, setOriginKey] = useState<string>(() => originOptions[0]?.id || 'SFO-TGL-EXIT-28L-F');
+  const [destinationKey, setDestinationKey] = useState<string>(() => destinationOptions[0]?.id || 'SFO-STAND-A6');
 
   // Obstacle Clearance State
   const [obstacleResults, setObstacleResults] = useState<ObstacleCheckResult[]>([]);
@@ -69,17 +81,18 @@ export const SpatialAnalysisHUD: React.FC<SpatialAnalysisHUDProps> = ({
   const [copiedDdl, setCopiedDdl] = useState<boolean>(false);
   const [selectedSchemaTable, setSelectedSchemaTable] = useState<string>('do272_runway_elements');
 
-  // Find routing origins (exits/guidance lines) and destinations (parking stands)
-  const originOptions = dataset.features.filter(
-    (f) =>
-      f.featureClass === 'TaxiwayGuidanceLine' ||
-      f.featureClass === 'RunwayThreshold' ||
-      f.featureClass === 'RunwayHoldingPosition'
-  );
-
-  const destinationOptions = dataset.features.filter(
-    (f) => f.featureClass === 'ParkingStandArea'
-  );
+  // Auto-sync origin and destination when switching between aerodromes
+  useEffect(() => {
+    if (originOptions.length > 0 && !originOptions.some((o) => o.id === originKey)) {
+      setOriginKey(originOptions[0].id);
+    }
+    if (destinationOptions.length > 0 && !destinationOptions.some((d) => d.id === destinationKey)) {
+      setDestinationKey(destinationOptions[0].id);
+    }
+    setActiveRoute(null);
+    setHasEvaluatedObstacles(false);
+    setObstacleResults([]);
+  }, [dataset.icao]);
 
   const handleSolveRoute = () => {
     const route = calculateTaxiRoute(dataset, originKey, destinationKey);

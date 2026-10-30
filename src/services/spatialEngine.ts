@@ -36,6 +36,41 @@ export function haversineDistanceMeters(
 }
 
 /**
+ * Calculates minimum distance in meters from a coordinate point to a runway polygon
+ * Samples polygon vertices and edges for true physical separation.
+ */
+export function distanceToRunwayMeters(
+  point: [number, number],
+  runwayCoords: [number, number][]
+): number {
+  if (!Array.isArray(runwayCoords) || runwayCoords.length === 0) return Infinity;
+
+  let minDist = Infinity;
+  // Check distance to all polygon vertices
+  for (const v of runwayCoords) {
+    const d = haversineDistanceMeters(point, v);
+    if (d < minDist) minDist = d;
+  }
+
+  // Interpolate along edges (10 samples per segment) for sub-meter boundary precision
+  for (let i = 0; i < runwayCoords.length; i++) {
+    const p1 = runwayCoords[i];
+    const p2 = runwayCoords[(i + 1) % runwayCoords.length];
+    for (let step = 1; step < 10; step++) {
+      const frac = step / 10;
+      const interp: [number, number] = [
+        p1[0] + (p2[0] - p1[0]) * frac,
+        p1[1] + (p2[1] - p1[1]) * frac,
+      ];
+      const d = haversineDistanceMeters(point, interp);
+      if (d < minDist) minDist = d;
+    }
+  }
+
+  return minDist;
+}
+
+/**
  * Dijkstra / Network Shortest Path Solver on Taxiway Guidance Lines
  */
 export function calculateTaxiRoute(
@@ -48,11 +83,7 @@ export function calculateTaxiRoute(
     (f) => f.featureClass === 'TaxiwayGuidanceLine' || f.featureClass === 'StandGuidanceLine'
   );
 
-  // Extract all points from features
-  const pathCoordinates: [number, number][] = [];
-  const routeSteps: string[] = [];
-
-  // Match origin coordinate
+  // Match origin and destination coordinates
   const originFeature = dataset.features.find((f) => f.id === originKey || f.designator === originKey);
   const destFeature = dataset.features.find((f) => f.id === destinationKey || f.designator === destinationKey);
 
@@ -75,27 +106,152 @@ export function calculateTaxiRoute(
     }
   }
 
-  pathCoordinates.push(startCoord);
-  routeSteps.push(`Depart ${originFeature?.designator || 'Runway Exit'}`);
+  // 1. Build Network Graph with snap threshold to connect intersecting guidance lines
+  const nodes: [number, number][] = [];
+  const SNAP_THRESHOLD_METERS = 20;
 
-  // Trace along available guidance segments
+  function getOrCreateNode(pt: [number, number]): number {
+    for (let i = 0; i < nodes.length; i++) {
+      if (haversineDistanceMeters(nodes[i], pt) <= SNAP_THRESHOLD_METERS) {
+        return i;
+      }
+    }
+    nodes.push(pt);
+    return nodes.length - 1;
+  }
+
+  interface GraphEdge {
+    to: number;
+    weight: number;
+    designator: string;
+  }
+
+  const adj: GraphEdge[][] = [];
+
   for (const gf of guidanceFeatures) {
     if (Array.isArray(gf.coordinates) && Array.isArray(gf.coordinates[0])) {
       const segCoords = gf.coordinates as [number, number][];
-      for (const pt of segCoords) {
-        // Only include if in reasonable direction
-        if (haversineDistanceMeters(startCoord, pt) < 3000) {
-          pathCoordinates.push(pt);
-          if (!routeSteps.includes(`Follow ${gf.designator}`)) {
-            routeSteps.push(`Follow ${gf.designator}`);
-          }
+      for (let i = 0; i < segCoords.length - 1; i++) {
+        const u = getOrCreateNode(segCoords[i]);
+        const v = getOrCreateNode(segCoords[i + 1]);
+        if (u === v) continue;
+
+        while (adj.length <= Math.max(u, v)) {
+          adj.push([]);
+        }
+
+        const dist = haversineDistanceMeters(nodes[u], nodes[v]);
+        adj[u].push({ to: v, weight: dist, designator: gf.designator });
+        if (gf.properties?.isReversible !== false) {
+          adj[v].push({ to: u, weight: dist, designator: gf.designator });
         }
       }
     }
   }
 
-  pathCoordinates.push(endCoord);
-  routeSteps.push(`Hold short and taxi into ${destFeature?.designator || 'Assigned Stand'}`);
+  // 2. Identify nearest nodes to startCoord and endCoord
+  let startNodeIdx = -1;
+  let minStartDist = Infinity;
+  let endNodeIdx = -1;
+  let minEndDist = Infinity;
+
+  for (let i = 0; i < nodes.length; i++) {
+    const ds = haversineDistanceMeters(startCoord, nodes[i]);
+    if (ds < minStartDist) {
+      minStartDist = ds;
+      startNodeIdx = i;
+    }
+    const de = haversineDistanceMeters(endCoord, nodes[i]);
+    if (de < minEndDist) {
+      minEndDist = de;
+      endNodeIdx = i;
+    }
+  }
+
+  let pathCoordinates: [number, number][] = [];
+  const routeSteps: string[] = [];
+
+  // 3. Dijkstra Shortest Path Search
+  if (startNodeIdx !== -1 && endNodeIdx !== -1 && nodes.length > 0) {
+    if (startNodeIdx === endNodeIdx) {
+      pathCoordinates = [startCoord, nodes[startNodeIdx], endCoord];
+      routeSteps.push(`Depart ${originFeature?.designator || 'Origin'}`);
+      routeSteps.push(`Direct taxi into ${destFeature?.designator || 'Destination'}`);
+    } else {
+      const dist = new Array(nodes.length).fill(Infinity);
+      const prev = new Array<{ node: number; designator: string } | null>(nodes.length).fill(null);
+      const visited = new Set<number>();
+
+      dist[startNodeIdx] = 0;
+
+      for (let step = 0; step < nodes.length; step++) {
+        let u = -1;
+        let minD = Infinity;
+        for (let i = 0; i < nodes.length; i++) {
+          if (!visited.has(i) && dist[i] < minD) {
+            minD = dist[i];
+            u = i;
+          }
+        }
+
+        if (u === -1 || u === endNodeIdx) break;
+        visited.add(u);
+
+        const neighbors = adj[u] || [];
+        for (const edge of neighbors) {
+          if (!visited.has(edge.to)) {
+            const newD = dist[u] + edge.weight;
+            if (newD < dist[edge.to]) {
+              dist[edge.to] = newD;
+              prev[edge.to] = { node: u, designator: edge.designator };
+            }
+          }
+        }
+      }
+
+      if (dist[endNodeIdx] !== Infinity) {
+        // Path reconstructed backwards from destination node
+        const nodePath: number[] = [];
+        const edgeDesignators: string[] = [];
+        let curr = endNodeIdx;
+        while (curr !== startNodeIdx) {
+          nodePath.push(curr);
+          const p = prev[curr];
+          if (p) {
+            edgeDesignators.push(p.designator);
+            curr = p.node;
+          } else {
+            break;
+          }
+        }
+        nodePath.push(startNodeIdx);
+        nodePath.reverse();
+        edgeDesignators.reverse();
+
+        pathCoordinates = [startCoord, ...nodePath.map((idx) => nodes[idx]), endCoord];
+
+        routeSteps.push(`Depart ${originFeature?.designator || 'Hold Point / Stand'}`);
+        // Deduplicate consecutive segments for clean ATC clearances
+        const uniqueEdges: string[] = [];
+        for (const ed of edgeDesignators) {
+          if (uniqueEdges.length === 0 || uniqueEdges[uniqueEdges.length - 1] !== ed) {
+            uniqueEdges.push(ed);
+          }
+        }
+        for (const e of uniqueEdges) {
+          routeSteps.push(`Taxi via ${e}`);
+        }
+        routeSteps.push(`Arrive and hold at ${destFeature?.designator || 'Assigned Stand'}`);
+      }
+    }
+  }
+
+  // Graceful fallback if nodes unconnected
+  if (pathCoordinates.length === 0) {
+    pathCoordinates = [startCoord, endCoord];
+    routeSteps.push(`Depart ${originFeature?.designator || 'Origin'}`);
+    routeSteps.push(`Direct taxi link to ${destFeature?.designator || 'Destination'}`);
+  }
 
   // Calculate total path distance
   let totalDistance = 0;
@@ -111,7 +267,7 @@ export function calculateTaxiRoute(
       ? (hf.coordinates as [number, number][])[0]
       : (hf.coordinates as [number, number]);
     for (const pt of pathCoordinates) {
-      if (haversineDistanceMeters(hCoord, pt) < 90) {
+      if (haversineDistanceMeters(hCoord, pt) < 60) {
         if (!holdPositionsEncountered.includes(hf.designator)) {
           holdPositionsEncountered.push(hf.designator);
         }
@@ -119,13 +275,13 @@ export function calculateTaxiRoute(
     }
   }
 
-  // Identify Hot Spots traversed
+  // Identify Hot Spots traversed (< 90m)
   const hotSpotsEncountered: string[] = [];
   const hotSpotFeatures = dataset.features.filter((f) => f.featureClass === 'HotSpot');
   for (const hs of hotSpotFeatures) {
     const hsCoord = (hs.coordinates as [number, number][])[0];
     for (const pt of pathCoordinates) {
-      if (haversineDistanceMeters(hsCoord, pt) < 150) {
+      if (haversineDistanceMeters(hsCoord, pt) < 90) {
         if (!hotSpotsEncountered.includes(hs.designator)) {
           hotSpotsEncountered.push(hs.designator);
         }
@@ -171,10 +327,10 @@ export function evaluateObstacleClearances(dataset: AerodromeDataset): ObstacleC
       : (obs.coordinates as [number, number]);
 
     for (const rwy of runways) {
-      const rwyCenter: [number, number] = Array.isArray(rwy.coordinates[0])
-        ? (rwy.coordinates as [number, number][])[0]
-        : (rwy.coordinates as [number, number]);
-      const dist = haversineDistanceMeters(obsCoord, rwyCenter);
+      const rwyCoords = (Array.isArray(rwy.coordinates) && Array.isArray(rwy.coordinates[0]))
+        ? (rwy.coordinates as [number, number][])
+        : [];
+      const dist = distanceToRunwayMeters(obsCoord, rwyCoords);
       if (dist < minDistance) {
         minDistance = dist;
         nearestRwyName = rwy.designator;
@@ -433,10 +589,10 @@ export function validateDO272Compliance(
     let minRwyDist = Infinity;
     let closestRwy = 'Unknown';
     for (const rwy of runways) {
-      const rwyCenter: [number, number] = Array.isArray(rwy.coordinates[0])
-        ? (rwy.coordinates as [number, number][])[0]
-        : (rwy.coordinates as [number, number]);
-      const dist = haversineDistanceMeters(hpCoord, rwyCenter);
+      const rwyCoords = (Array.isArray(rwy.coordinates) && Array.isArray(rwy.coordinates[0]))
+        ? (rwy.coordinates as [number, number][])
+        : [];
+      const dist = distanceToRunwayMeters(hpCoord, rwyCoords);
       if (dist < minRwyDist) {
         minRwyDist = dist;
         closestRwy = rwy.designator;
@@ -514,10 +670,10 @@ export function validateDO272Compliance(
 
     let distToRwy = Infinity;
     for (const rwy of runways) {
-      const rwyCoord: [number, number] = Array.isArray(rwy.coordinates[0])
-        ? (rwy.coordinates as [number, number][])[0]
-        : (rwy.coordinates as [number, number]);
-      const d = haversineDistanceMeters(obsCoord, rwyCoord);
+      const rwyCoords = (Array.isArray(rwy.coordinates) && Array.isArray(rwy.coordinates[0]))
+        ? (rwy.coordinates as [number, number][])
+        : [];
+      const d = distanceToRunwayMeters(obsCoord, rwyCoords);
       if (d < distToRwy) distToRwy = d;
     }
 

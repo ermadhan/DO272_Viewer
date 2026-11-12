@@ -20,12 +20,14 @@ import { WindowsSetupModal } from './components/WindowsSetupModal';
 import { DataIngestModal } from './components/DataIngestModal';
 import { DO272CatalogueModal } from './components/DO272CatalogueModal';
 import { DO272FeatureExplorer } from './components/DO272FeatureExplorer';
+import { MCPAgentChat } from './components/MCPAgentChat';
+import { AgentMapSyncPayload } from './services/mcpAgentService';
 import { DatabaseEngine } from './services/databaseSchema';
 import { Loader2, RefreshCw } from 'lucide-react';
 
 export default function App() {
   // Navigation & View State
-  const [activeTab, setActiveTab] = useState<'map' | 'features' | 'routing' | 'obstacles' | 'sql' | 'mcp' | 'windows'>('map');
+  const [activeTab, setActiveTab] = useState<'map' | 'features' | 'routing' | 'obstacles' | 'sql' | 'mcp' | 'agent' | 'windows'>('map');
   const [databaseEngine, setDatabaseEngine] = useState<DatabaseEngine>('postgres');
   const [isFetchingLiveOsm, setIsFetchingLiveOsm] = useState<boolean>(false);
   const [selectedIcao, setSelectedIcao] = useState<string>('KSFO');
@@ -109,6 +111,22 @@ export default function App() {
       console.error('Failed to sync live OSM data', e);
     } finally {
       setIsFetchingLiveOsm(false);
+    }
+  };
+
+  const handleApplyAgentGeometry = (payload: AgentMapSyncPayload) => {
+    if (payload.type === 'route' && payload.taxiRoute) {
+      setActiveRoute(payload.taxiRoute);
+      setHighlightedFeatureIds([]);
+    } else if (payload.type === 'features' && payload.highlightFeatureIds) {
+      setHighlightedFeatureIds(payload.highlightFeatureIds);
+    } else if (payload.type === 'obstacle') {
+      if (payload.focusedFeature) {
+        setSelectedFeature(payload.focusedFeature);
+      }
+      if (payload.highlightFeatureIds) {
+        setHighlightedFeatureIds(payload.highlightFeatureIds);
+      }
     }
   };
 
@@ -242,7 +260,18 @@ export default function App() {
             {/* Model Context Protocol (MCP) Studio Drawer */}
             {activeTab === 'mcp' && (
               <div className="w-[640px] h-full z-30 p-3 bg-slate-950/90 backdrop-blur-md border-l border-slate-800 shadow-2xl flex flex-col">
-                <MCPStudio dataset={currentDataset} />
+                <MCPStudio dataset={currentDataset} onSwitchToAgent={() => setActiveTab('agent')} />
+              </div>
+            )}
+
+            {/* Model Context Protocol (MCP) AI Agent Client Drawer */}
+            {activeTab === 'agent' && (
+              <div className="w-[660px] h-full z-30 p-3 bg-slate-950/95 backdrop-blur-md border-l border-slate-800 shadow-2xl flex flex-col">
+                <MCPAgentChat
+                  dataset={currentDataset}
+                  onApplyMapGeometry={handleApplyAgentGeometry}
+                  onNavigateToMap={() => {}}
+                />
               </div>
             )}
           </>

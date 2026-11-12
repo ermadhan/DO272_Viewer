@@ -14,15 +14,17 @@ import {
   AlertOctagon,
   CheckCircle,
   Info,
+  Bot,
 } from 'lucide-react';
 import { AerodromeDataset, DO272ValidationReport } from '../types/do272';
 import { validateDO272Compliance } from '../services/spatialEngine';
 
 interface MCPStudioProps {
   dataset: AerodromeDataset;
+  onSwitchToAgent?: () => void;
 }
 
-export const MCPStudio: React.FC<MCPStudioProps> = ({ dataset }) => {
+export const MCPStudio: React.FC<MCPStudioProps> = ({ dataset, onSwitchToAgent }) => {
   const [selectedTool, setSelectedTool] = useState<string>('do272_validate_compliance');
   const [copiedConfig, setCopiedConfig] = useState(false);
   const [activeTab, setActiveTab] = useState<'tester' | 'config' | 'spec'>('tester');
@@ -191,9 +193,21 @@ export const MCPStudio: React.FC<MCPStudioProps> = ({ dataset }) => {
           </h2>
         </div>
 
-        <div className="flex items-center gap-1 bg-slate-950 p-1 rounded-lg border border-slate-800 text-xs font-mono">
-          <button
-            onClick={() => setActiveTab('tester')}
+        <div className="flex items-center gap-2">
+          {onSwitchToAgent && (
+            <button
+              onClick={onSwitchToAgent}
+              className="flex items-center gap-1.5 px-3 py-1.5 bg-cyan-950/70 hover:bg-cyan-900 border border-cyan-800/80 text-cyan-300 rounded-lg text-xs font-mono transition-colors cursor-pointer shadow-xs"
+              title="Switch to conversational AI Agent Client"
+            >
+              <Bot className="w-3.5 h-3.5 text-cyan-400" />
+              <span>AI Agent Client</span>
+            </button>
+          )}
+
+          <div className="flex items-center gap-1 bg-slate-950 p-1 rounded-lg border border-slate-800 text-xs font-mono">
+            <button
+              onClick={() => setActiveTab('tester')}
             className={`flex items-center gap-1.5 px-3 py-1.5 rounded-md transition-colors ${
               activeTab === 'tester'
                 ? 'bg-cyan-500/20 text-cyan-300 font-semibold border border-cyan-500/40'
@@ -227,6 +241,7 @@ export const MCPStudio: React.FC<MCPStudioProps> = ({ dataset }) => {
           </button>
         </div>
       </div>
+    </div>
 
       {/* Main Content Area */}
       <div className="flex-1 overflow-y-auto pt-4 text-xs space-y-4">

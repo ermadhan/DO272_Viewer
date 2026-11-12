@@ -1,10 +1,10 @@
 import React from 'react';
-import { Database, Download, Terminal, Plane, Compass, ShieldAlert, Cpu, BookOpen, Layers } from 'lucide-react';
+import { Database, Download, Terminal, Plane, Compass, ShieldAlert, Cpu, BookOpen, Layers, Bot } from 'lucide-react';
 import { DatabaseEngine } from '../services/databaseSchema';
 
 interface HeaderProps {
-  activeTab: 'map' | 'features' | 'routing' | 'obstacles' | 'sql' | 'mcp' | 'windows';
-  setActiveTab: (tab: 'map' | 'features' | 'routing' | 'obstacles' | 'sql' | 'mcp' | 'windows') => void;
+  activeTab: 'map' | 'features' | 'routing' | 'obstacles' | 'sql' | 'mcp' | 'agent' | 'windows';
+  setActiveTab: (tab: 'map' | 'features' | 'routing' | 'obstacles' | 'sql' | 'mcp' | 'agent' | 'windows') => void;
   selectedIcao: string;
   onSelectIcao: (icao: string) => void;
   databaseEngine: DatabaseEngine;
@@ -142,6 +142,18 @@ export const Header: React.FC<HeaderProps> = ({
         >
           <Cpu className="w-3.5 h-3.5 text-cyan-400" />
           MCP Studio
+        </button>
+        <button
+          onClick={() => setActiveTab('agent')}
+          className={`flex items-center gap-2 px-3.5 py-1.5 rounded-md text-xs transition-colors whitespace-nowrap cursor-pointer ${
+            activeTab === 'agent'
+              ? 'bg-cyan-900/60 text-cyan-200 border border-cyan-700/60 shadow-sm font-semibold'
+              : 'text-slate-400 hover:text-slate-200'
+          }`}
+          title="Autonomous in-app DO-272 MCP AI Agent Client"
+        >
+          <Bot className="w-3.5 h-3.5 text-cyan-400" />
+          AI Agent Client
         </button>
         <button
           onClick={onOpenCatalogue}

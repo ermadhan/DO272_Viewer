@@ -230,11 +230,18 @@ async def run_stdio_mcp():
                 name = params.get("name")
                 args = params.get("arguments", {})
                 result = handle_tool_call(name, args)
-                resp = {
-                    "jsonrpc": "2.0",
-                    "id": msg_id,
-                    "result": {"content": [{"type": "text", "text": json.dumps(result, indent=2)}]},
-                }
+                if "error" in result:
+                    resp = {
+                        "jsonrpc": "2.0",
+                        "id": msg_id,
+                        "error": {"code": -32601, "message": result["error"]},
+                    }
+                else:
+                    resp = {
+                        "jsonrpc": "2.0",
+                        "id": msg_id,
+                        "result": {"content": [{"type": "text", "text": json.dumps(result, indent=2)}]},
+                    }
             elif method == "initialize":
                 resp = {
                     "jsonrpc": "2.0",

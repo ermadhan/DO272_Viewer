@@ -1,0 +1,173 @@
+{
+  "icao": "OMDB",
+  "iata": "DXB",
+  "name": "Dubai International Airport",
+  "city": "Dubai",
+  "country": "United Arab Emirates",
+  "center": [
+    25.2532,
+    55.3657
+  ],
+  "elevationMeters": 15.0,
+  "magneticVariation": "2.4\u00b0W",
+  "transitionAltitudeFt": 18000,
+  "source": "Curated Hub (DO-272/ED-99)",
+  "features": [
+    {
+      "id": "OMDB-RWY-09L-27R",
+      "aerodromeId": "OMDB",
+      "featureClass": "RunwayElement",
+      "designator": "09L/27R",
+      "status": "Active",
+      "lengthMeters": 3600,
+      "widthMeters": 60,
+      "surface": "Concrete",
+      "pcnRating": "115/R/B/W/T",
+      "coordinates": [
+        [
+          25.2469,
+          55.3567
+        ],
+        [
+          25.2589,
+          55.3747
+        ],
+        [
+          25.2595,
+          55.3747
+        ],
+        [
+          25.2475,
+          55.3567
+        ],
+        [
+          25.2469,
+          55.3567
+        ]
+      ]
+    },
+    {
+      "id": "OMDB-RWY-09R-27L",
+      "aerodromeId": "OMDB",
+      "featureClass": "RunwayElement",
+      "designator": "09R/27L",
+      "status": "Active",
+      "lengthMeters": 3200,
+      "widthMeters": 45,
+      "surface": "Asphalt",
+      "pcnRating": "98/F/A/W/T",
+      "coordinates": [
+        [
+          25.243199999999998,
+          55.3567
+        ],
+        [
+          25.2552,
+          55.3747
+        ],
+        [
+          25.2558,
+          55.3747
+        ],
+        [
+          25.2438,
+          55.3567
+        ],
+        [
+          25.243199999999998,
+          55.3567
+        ]
+      ]
+    },
+    {
+      "id": "OMDB-TGL-A",
+      "aerodromeId": "OMDB",
+      "featureClass": "TaxiwayGuidanceLine",
+      "designator": "TGL-Alpha",
+      "status": "Active",
+      "isReversible": true,
+      "coordinates": [
+        [
+          25.2484,
+          55.3567
+        ],
+        [
+          25.2532,
+          55.3657
+        ],
+        [
+          25.2604,
+          55.3747
+        ]
+      ]
+    },
+    {
+      "id": "OMDB-TGL-B",
+      "aerodromeId": "OMDB",
+      "featureClass": "TaxiwayGuidanceLine",
+      "designator": "TGL-Bravo",
+      "status": "Active",
+      "isReversible": true,
+      "coordinates": [
+        [
+          25.2452,
+          55.3567
+        ],
+        [
+          25.2512,
+          55.3657
+        ],
+        [
+          25.2572,
+          55.3747
+        ]
+      ]
+    },
+    {
+      "id": "OMDB-STAND-1",
+      "aerodromeId": "OMDB",
+      "featureClass": "ParkingStandArea",
+      "designator": "Gate 1",
+      "standNumber": "1",
+      "status": "Active",
+      "coordinates": [
+        [
+          25.2557,
+          55.363899999999994
+        ],
+        [
+          25.2563,
+          55.363899999999994
+        ],
+        [
+          25.2563,
+          55.3645
+        ],
+        [
+          25.2557,
+          55.3645
+        ],
+        [
+          25.2557,
+          55.363899999999994
+        ]
+      ]
+    },
+    {
+      "id": "OMDB-VS-TOWER",
+      "aerodromeId": "OMDB",
+      "featureClass": "VerticalStructure",
+      "designator": "Dubai International Airport Control Tower",
+      "structureType": "Control Tower",
+      "status": "Active",
+      "heightAglMeters": 78.0,
+      "elevationAmslMeters": 93.0,
+      "frangible": false,
+      "lightingType": "High-Intensity White",
+      "coordinates": [
+        25.2572,
+        55.3657
+      ]
+    }
+  ]
+}

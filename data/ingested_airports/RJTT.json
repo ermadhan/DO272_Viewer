@@ -1,0 +1,322 @@
+{
+  "icao": "RJTT",
+  "iata": "HND",
+  "name": "Tokyo Haneda Airport",
+  "city": "Tokyo",
+  "country": "Japan",
+  "center": [
+    35.5494,
+    139.7798
+  ],
+  "elevationMeters": 15,
+  "magneticVariation": "2.4°W",
+  "transitionAltitudeFt": 18000,
+  "source": "Curated Hub (DO-272/ED-99)",
+  "features": [
+    {
+      "id": "RJTT-RWY-09L-27R",
+      "aerodromeId": "RJTT",
+      "featureClass": "RunwayElement",
+      "designator": "09L/27R",
+      "status": "Active",
+      "lengthMeters": 3600,
+      "widthMeters": 60,
+      "trueHeading": 90,
+      "surface": "Concrete",
+      "pcnRating": "115/R/B/W/T",
+      "coordinates": [
+        [
+          35.543099999999995,
+          139.7708
+        ],
+        [
+          35.555099999999996,
+          139.78879999999998
+        ],
+        [
+          35.5557,
+          139.78879999999998
+        ],
+        [
+          35.5437,
+          139.7708
+        ],
+        [
+          35.543099999999995,
+          139.7708
+        ]
+      ],
+      "properties": {
+        "grooved": true,
+        "category": "CAT IIIb"
+      }
+    },
+    {
+      "id": "RJTT-RWY-09R-27L",
+      "aerodromeId": "RJTT",
+      "featureClass": "RunwayElement",
+      "designator": "09R/27L",
+      "status": "Active",
+      "lengthMeters": 3200,
+      "widthMeters": 45,
+      "trueHeading": 90,
+      "surface": "Asphalt",
+      "pcnRating": "98/F/A/W/T",
+      "coordinates": [
+        [
+          35.5394,
+          139.7708
+        ],
+        [
+          35.5514,
+          139.78879999999998
+        ],
+        [
+          35.552,
+          139.78879999999998
+        ],
+        [
+          35.54,
+          139.7708
+        ],
+        [
+          35.5394,
+          139.7708
+        ]
+      ],
+      "properties": {
+        "grooved": true,
+        "category": "CAT II"
+      }
+    },
+    {
+      "id": "RJTT-THR-09L",
+      "aerodromeId": "RJTT",
+      "featureClass": "RunwayThreshold",
+      "designator": "THR 09L",
+      "status": "Active",
+      "elevationMeters": 15,
+      "lengthMeters": 60,
+      "widthMeters": 10,
+      "trueHeading": 90,
+      "surface": "Concrete",
+      "pcnRating": "115/R/B/W/T",
+      "coordinates": [
+        [
+          35.543099999999995,
+          139.7708
+        ],
+        [
+          35.5437,
+          139.7708
+        ]
+      ]
+    },
+    {
+      "id": "RJTT-TGL-A",
+      "aerodromeId": "RJTT",
+      "featureClass": "TaxiwayGuidanceLine",
+      "designator": "TGL-Alpha",
+      "status": "Active",
+      "isReversible": true,
+      "coordinates": [
+        [
+          35.544599999999996,
+          139.7708
+        ],
+        [
+          35.5494,
+          139.7798
+        ],
+        [
+          35.556599999999996,
+          139.78879999999998
+        ]
+      ]
+    },
+    {
+      "id": "RJTT-TGL-B",
+      "aerodromeId": "RJTT",
+      "featureClass": "TaxiwayGuidanceLine",
+      "designator": "TGL-Bravo",
+      "status": "Active",
+      "isReversible": true,
+      "coordinates": [
+        [
+          35.541399999999996,
+          139.7708
+        ],
+        [
+          35.547399999999996,
+          139.7798
+        ],
+        [
+          35.553399999999996,
+          139.78879999999998
+        ]
+      ]
+    },
+    {
+      "id": "RJTT-TGL-CROSS",
+      "aerodromeId": "RJTT",
+      "featureClass": "TaxiwayGuidanceLine",
+      "designator": "TGL-Spine-Connector",
+      "status": "Active",
+      "isReversible": true,
+      "coordinates": [
+        [
+          35.547399999999996,
+          139.7798
+        ],
+        [
+          35.5494,
+          139.7798
+        ],
+        [
+          35.551899999999996,
+          139.7798
+        ]
+      ]
+    },
+    {
+      "id": "RJTT-SGL-G1",
+      "aerodromeId": "RJTT",
+      "featureClass": "StandGuidanceLine",
+      "designator": "Lead-in Gate 1",
+      "status": "Active",
+      "coordinates": [
+        [
+          35.551899999999996,
+          139.7798
+        ],
+        [
+          35.5522,
+          139.7783
+        ]
+      ]
+    },
+    {
+      "id": "RJTT-SGL-G2",
+      "aerodromeId": "RJTT",
+      "featureClass": "StandGuidanceLine",
+      "designator": "Lead-in Gate 2",
+      "status": "Active",
+      "coordinates": [
+        [
+          35.551899999999996,
+          139.7798
+        ],
+        [
+          35.5522,
+          139.7813
+        ]
+      ]
+    },
+    {
+      "id": "RJTT-HOLD-09L",
+      "aerodromeId": "RJTT",
+      "featureClass": "RunwayHoldingPosition",
+      "designator": "HOLD RWY 09L @ A",
+      "status": "Active",
+      "holdingCategory": "CAT III",
+      "coordinates": [
+        35.544,
+        139.7708
+      ]
+    },
+    {
+      "id": "RJTT-HOLD-09R",
+      "aerodromeId": "RJTT",
+      "featureClass": "RunwayHoldingPosition",
+      "designator": "HOLD RWY 09R @ B",
+      "status": "Active",
+      "holdingCategory": "CAT III",
+      "coordinates": [
+        35.5407,
+        139.7708
+      ]
+    },
+    {
+      "id": "RJTT-STAND-G1",
+      "aerodromeId": "RJTT",
+      "featureClass": "ParkingStandArea",
+      "designator": "Gate 1",
+      "standNumber": "1",
+      "terminal": "Main Terminal",
+      "status": "Active",
+      "icaoCodeLetter": "E",
+      "hasJetBridge": true,
+      "coordinates": [
+        [
+          35.551899999999996,
+          139.778
+        ],
+        [
+          35.5525,
+          139.778
+        ],
+        [
+          35.5525,
+          139.7786
+        ],
+        [
+          35.551899999999996,
+          139.7786
+        ],
+        [
+          35.551899999999996,
+          139.778
+        ]
+      ]
+    },
+    {
+      "id": "RJTT-STAND-G2",
+      "aerodromeId": "RJTT",
+      "featureClass": "ParkingStandArea",
+      "designator": "Gate 2",
+      "standNumber": "2",
+      "terminal": "Main Terminal",
+      "status": "Active",
+      "icaoCodeLetter": "F",
+      "hasJetBridge": true,
+      "coordinates": [
+        [
+          35.551899999999996,
+          139.78099999999998
+        ],
+        [
+          35.5525,
+          139.78099999999998
+        ],
+        [
+          35.5525,
+          139.7816
+        ],
+        [
+          35.551899999999996,
+          139.7816
+        ],
+        [
+          35.551899999999996,
+          139.78099999999998
+        ]
+      ]
+    },
+    {
+      "id": "RJTT-VS-TOWER",
+      "aerodromeId": "RJTT",
+      "featureClass": "VerticalStructure",
+      "designator": "Tokyo Haneda Airport Air Traffic Control Tower",
+      "structureType": "Control Tower",
+      "status": "Active",
+      "heightAglMeters": 78,
+      "elevationAmslMeters": 93,
+      "frangible": false,
+      "lightingType": "Dual Red/White Strobe",
+      "coordinates": [
+        35.553399999999996,
+        139.7798
+      ]
+    }
+  ]
+}

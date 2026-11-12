@@ -1,0 +1,173 @@
+{
+  "icao": "KDFW",
+  "iata": "DFW",
+  "name": "Dallas/Fort Worth International Airport",
+  "city": "Dallas-Fort Worth",
+  "country": "United States",
+  "center": [
+    32.8998,
+    -97.0403
+  ],
+  "elevationMeters": 15.0,
+  "magneticVariation": "2.4\u00b0W",
+  "transitionAltitudeFt": 18000,
+  "source": "Curated Hub (DO-272/ED-99)",
+  "features": [
+    {
+      "id": "KDFW-RWY-09L-27R",
+      "aerodromeId": "KDFW",
+      "featureClass": "RunwayElement",
+      "designator": "09L/27R",
+      "status": "Active",
+      "lengthMeters": 3600,
+      "widthMeters": 60,
+      "surface": "Concrete",
+      "pcnRating": "115/R/B/W/T",
+      "coordinates": [
+        [
+          32.893499999999996,
+          -97.0493
+        ],
+        [
+          32.905499999999996,
+          -97.0313
+        ],
+        [
+          32.9061,
+          -97.0313
+        ],
+        [
+          32.8941,
+          -97.0493
+        ],
+        [
+          32.893499999999996,
+          -97.0493
+        ]
+      ]
+    },
+    {
+      "id": "KDFW-RWY-09R-27L",
+      "aerodromeId": "KDFW",
+      "featureClass": "RunwayElement",
+      "designator": "09R/27L",
+      "status": "Active",
+      "lengthMeters": 3200,
+      "widthMeters": 45,
+      "surface": "Asphalt",
+      "pcnRating": "98/F/A/W/T",
+      "coordinates": [
+        [
+          32.8898,
+          -97.0493
+        ],
+        [
+          32.9018,
+          -97.0313
+        ],
+        [
+          32.9024,
+          -97.0313
+        ],
+        [
+          32.8904,
+          -97.0493
+        ],
+        [
+          32.8898,
+          -97.0493
+        ]
+      ]
+    },
+    {
+      "id": "KDFW-TGL-A",
+      "aerodromeId": "KDFW",
+      "featureClass": "TaxiwayGuidanceLine",
+      "designator": "TGL-Alpha",
+      "status": "Active",
+      "isReversible": true,
+      "coordinates": [
+        [
+          32.894999999999996,
+          -97.0493
+        ],
+        [
+          32.8998,
+          -97.0403
+        ],
+        [
+          32.907,
+          -97.0313
+        ]
+      ]
+    },
+    {
+      "id": "KDFW-TGL-B",
+      "aerodromeId": "KDFW",
+      "featureClass": "TaxiwayGuidanceLine",
+      "designator": "TGL-Bravo",
+      "status": "Active",
+      "isReversible": true,
+      "coordinates": [
+        [
+          32.891799999999996,
+          -97.0493
+        ],
+        [
+          32.8978,
+          -97.0403
+        ],
+        [
+          32.9038,
+          -97.0313
+        ]
+      ]
+    },
+    {
+      "id": "KDFW-STAND-1",
+      "aerodromeId": "KDFW",
+      "featureClass": "ParkingStandArea",
+      "designator": "Gate 1",
+      "standNumber": "1",
+      "status": "Active",
+      "coordinates": [
+        [
+          32.9023,
+          -97.0421
+        ],
+        [
+          32.9029,
+          -97.0421
+        ],
+        [
+          32.9029,
+          -97.0415
+        ],
+        [
+          32.9023,
+          -97.0415
+        ],
+        [
+          32.9023,
+          -97.0421
+        ]
+      ]
+    },
+    {
+      "id": "KDFW-VS-TOWER",
+      "aerodromeId": "KDFW",
+      "featureClass": "VerticalStructure",
+      "designator": "Dallas/Fort Worth International Airport Control Tower",
+      "structureType": "Control Tower",
+      "status": "Active",
+      "heightAglMeters": 78.0,
+      "elevationAmslMeters": 93.0,
+      "frangible": false,
+      "lightingType": "High-Intensity White",
+      "coordinates": [
+        32.9038,
+        -97.0403
+      ]
+    }
+  ]
+}

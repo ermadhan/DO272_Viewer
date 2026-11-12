@@ -1,0 +1,51 @@
+rank,name,city,country,iata,icao,lat,lon
+1,Hartsfield–Jackson Atlanta International Airport,Atlanta,United States,ATL,KATL,33.6407,-84.4277
+2,Dubai International Airport,Dubai,United Arab Emirates,DXB,OMDB,25.2532,55.3657
+3,Dallas/Fort Worth International Airport,Dallas-Fort Worth,United States,DFW,KDFW,32.8998,-97.0403
+4,London Heathrow Airport,London,United Kingdom,LHR,EGLL,51.4700,-0.4543
+5,Tokyo Haneda Airport,Tokyo,Japan,HND,RJTT,35.5494,139.7798
+6,Denver International Airport,Denver,United States,DEN,KDEN,39.8561,-104.6737
+7,Istanbul Airport,Istanbul,Turkey,IST,LTFM,41.2753,28.7519
+8,Chicago O'Hare International Airport,Chicago,United States,ORD,KORD,41.9742,-87.9073
+9,Indira Gandhi International Airport,Delhi,India,DEL,VIDP,28.5562,77.1000
+10,Paris Charles de Gaulle Airport,Paris,France,CDG,LFPG,49.0097,2.5479
+11,Harry Reid International Airport,Las Vegas,United States,LAS,KLAS,36.0840,-115.1537
+12,Amsterdam Airport Schiphol,Amsterdam,Netherlands,AMS,EHAM,52.3105,4.7683
+13,Orlando International Airport,Orlando,United States,MCO,KMCO,28.4312,-81.3081
+14,Singapore Changi Airport,Singapore,Singapore,SIN,WSSS,1.3644,103.9915
+15,John F. Kennedy International Airport,New York,United States,JFK,KJFK,40.6413,-73.7781
+16,Adolfo Suárez Madrid–Barajas Airport,Madrid,Spain,MAD,LEMD,40.4839,-3.5680
+17,Los Angeles International Airport,Los Angeles,United States,LAX,KLAX,33.9416,-118.4085
+18,Frankfurt Airport,Frankfurt,Germany,FRA,EDDF,50.0379,8.5622
+19,Beijing Capital International Airport,Beijing,China,PEK,ZBAA,40.0799,116.6031
+20,Hong Kong International Airport,Hong Kong,China,HKG,VHHH,22.3080,113.9185
+21,Charlotte Douglas International Airport,Charlotte,United States,CLT,KCLT,35.2144,-80.9473
+22,Josep Tarradellas Barcelona–El Prat Airport,Barcelona,Spain,BCN,LEBL,41.2974,2.0833
+23,San Francisco International Airport,San Francisco,United States,SFO,KSFO,37.6189,-122.3750
+24,Miami International Airport,Miami,United States,MIA,KMIA,25.7959,-80.2870
+25,Incheon International Airport,Seoul,South Korea,ICN,RKSI,37.4602,126.4407
+26,Phoenix Sky Harbor International Airport,Phoenix,United States,PHX,KPHX,33.4342,-112.0080
+27,Rome Fiumicino Leonardo da Vinci Airport,Rome,Italy,FCO,LIRF,41.8003,12.2389
+28,Chhatrapati Shivaji Maharaj International Airport,Mumbai,India,BOM,VABB,19.0896,72.8656
+29,Seattle–Tacoma International Airport,Seattle,United States,SEA,KSEA,47.4502,-122.3088
+30,São Paulo/Guarulhos International Airport,São Paulo,Brazil,GRU,SBGR,-23.4356,-46.4731
+31,Toronto Pearson International Airport,Toronto,Canada,YYZ,CYYZ,43.6777,-79.6248
+32,Shanghai Pudong International Airport,Shanghai,China,PVG,ZSPD,31.1443,121.8083
+33,George Bush Intercontinental Airport,Houston,United States,IAH,KIAH,29.9902,-95.3368
+34,London Gatwick Airport,London,United Kingdom,LGW,EGKK,51.1537,-0.1821
+35,Kuala Lumpur International Airport,Kuala Lumpur,Malaysia,KUL,WMKK,2.7456,101.7072
+36,Suvarnabhumi Airport,Bangkok,Thailand,BKK,VTBS,13.6900,100.7501
+37,Boston Logan International Airport,Boston,United States,BOS,KBOS,42.3656,-71.0096
+38,Mexico City International Airport,Mexico City,Mexico,MEX,MMMX,19.4361,-99.0719
+39,Vienna International Airport,Vienna,Austria,VIE,LOWW,48.1103,16.5697
+40,Sheremetyevo International Airport,Moscow,Russia,SVO,UUEE,55.9726,37.4146
+41,Zayed International Airport,Abu Dhabi,United Arab Emirates,AUH,OMAA,24.4330,54.6511
+42,Munich Airport,Munich,Germany,MUC,EDDM,48.3537,11.7750
+43,Ninoy Aquino International Airport,Manila,Philippines,MNL,RPLL,14.5086,121.0194
+44,Paris Orly Airport,Paris,France,ORY,LFPO,48.7262,2.3652
+45,Brussels Airport,Brussels,Belgium,BRU,EBBR,50.9010,4.4844
+46,Helsinki Airport,Helsinki,Finland,HEL,EFHK,60.3172,24.9633
+47,Minneapolis–Saint Paul International Airport,Minneapolis,United States,MSP,KMSP,44.8848,-93.2223
+48,Detroit Metropolitan Airport,Detroit,United States,DTW,KDTW,42.2162,-83.3554
+49,Stockholm Arlanda Airport,Stockholm,Sweden,ARN,ESSA,59.6498,17.9238
+50,Oslo Airport Gardermoen,Oslo,Norway,OSL,ENGM,60.1976,11.1004

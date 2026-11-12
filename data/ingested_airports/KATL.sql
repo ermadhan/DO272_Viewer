@@ -1,0 +1,5 @@
+-- DO-272 Spatial SQL Inserts for Hartsfield–Jackson Atlanta International Airport (KATL)
+INSERT INTO do272_aerodromes (icao, iata, name, city, country, center_geom, elevation_m) VALUES ('KATL', 'ATL', 'Hartsfield–Jackson Atlanta International Airport', 'Atlanta', 'United States', ST_SetSRID(ST_MakePoint(-84.4277, 33.6407), 4326), 15) ON CONFLICT (icao) DO NOTHING;
+
+INSERT INTO do272_runways (id, aerodrome_id, designator, length_m, width_m, geom) VALUES ('KATL-RWY-09L-27R', 'KATL', '09L/27R', 3600, 60, ST_GeomFromText('POLYGON((-84.4367 33.6344, -84.4187 33.6464, -84.4187 33.647000000000006, -84.4367 33.635000000000005, -84.4367 33.6344))', 4326)) ON CONFLICT (id) DO NOTHING;
+INSERT INTO do272_runways (id, aerodrome_id, designator, length_m, width_m, geom) VALUES ('KATL-RWY-09R-27L', 'KATL', '09R/27L', 3200, 45, ST_GeomFromText('POLYGON((-84.4367 33.630700000000004, -84.4187 33.642700000000005, -84.4187 33.6433, -84.4367 33.6313, -84.4367 33.630700000000004))', 4326)) ON CONFLICT (id) DO NOTHING;

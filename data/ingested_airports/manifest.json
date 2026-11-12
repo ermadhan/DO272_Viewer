@@ -1,0 +1,35 @@
+[
+  {
+    "icao": "KATL",
+    "iata": "ATL",
+    "name": "Hartsfield\u2013Jackson Atlanta International Airport",
+    "city": "Atlanta",
+    "country": "United States",
+    "features": 6,
+    "runways": 2,
+    "taxiways": 2,
+    "stands": 1
+  },
+  {
+    "icao": "OMDB",
+    "iata": "DXB",
+    "name": "Dubai International Airport",
+    "city": "Dubai",
+    "country": "United Arab Emirates",
+    "features": 6,
+    "runways": 2,
+    "taxiways": 2,
+    "stands": 1
+  },
+  {
+    "icao": "KDFW",
+    "iata": "DFW",
+    "name": "Dallas/Fort Worth International Airport",
+    "city": "Dallas-Fort Worth",
+    "country": "United States",
+    "features": 6,
+    "runways": 2,
+    "taxiways": 2,
+    "stands": 1
+  }
+]

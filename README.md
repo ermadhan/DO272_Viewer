@@ -113,6 +113,68 @@ The platform provides a dual-surface MCP environment:
 
 ---
 
+## Command-Line Open Data Batch Ingestion (Top 50 Airports & Custom Lists)
+
+You can batch-ingest aerodrome datasets from the command line using either **Node.js (`npm run ingest`)** or **Python (`ingest_open_data.py`)**.
+
+### Included Reference Datasets
+* `data/top50_airports.csv`: Contains the **Top 50 Busiest Airports Worldwide** (from Wikipedia passenger traffic rankings) including Airport Name, City, Country, IATA, ICAO, and surveyed ARP coordinates.
+* `data/top50_airports.txt`: Plain text file containing the 50 ICAO codes (one per line).
+
+### Command-Line Usage (Node.js / npm)
+
+```cmd
+# Ingest all Top 50 airports from the CSV file:
+npm run ingest -- --csv data/top50_airports.csv
+
+# Ingest top 10 airports with PostGIS/SQLite SQL scripts generated:
+npm run ingest -- --csv data/top50_airports.csv --limit 10 --sql
+
+# Ingest from plain text file containing ICAO codes:
+npm run ingest -- --file data/top50_airports.txt
+
+# Ingest specific ICAO codes on demand:
+npm run ingest -- --icao KATL,KDFW,KORD,RJTT,VIDP,LTFM
+
+# Custom output directory:
+npm run ingest -- --csv data/top50_airports.csv --output my_datasets/
+```
+
+### Command-Line Usage (Python)
+
+On Windows or Linux systems with Python 3.10+:
+```cmd
+# Ingest top 50 airports from CSV:
+python python_backend/ingest_open_data.py --csv data/top50_airports.csv
+
+# Ingest from text file:
+python python_backend/ingest_open_data.py --file data/top50_airports.txt --limit 5
+
+# Ingest specific airports:
+python python_backend/ingest_open_data.py --icao KATL,KDFW,OMDB
+```
+
+### CLI Flags & Arguments Reference
+
+| Flag | Argument | Description | Default |
+| :--- | :--- | :--- | :--- |
+| `--csv` | `<path>` | Path to CSV file containing `icao` column | `data/top50_airports.csv` |
+| `--file` | `<path>` | Path to plain text file with one ICAO code per line | None |
+| `--icao` | `<codes>` | Comma-separated ICAO codes (e.g. `KATL,KORD`) | None |
+| `--limit` | `<num>` | Maximum number of airports to process from list | Process all |
+| `--output` | `<dir>` | Target output directory for datasets | `data/ingested_airports` |
+| `--delay` | `<ms>` | Delay between queries in milliseconds | `500` ms |
+| `--sql` | *flag* | Export PostGIS / SQLite SQL insert scripts (`*.sql`) | Disabled |
+| `--no-validate` | *flag* | Skip post-ingestion DO-272 compliance audit | Validate enabled |
+
+### Output Artifacts
+Each run populates the output folder with:
+* `<ICAO>.json`: Full RTCA DO-272 compliant JSON dataset with all classified features.
+* `<ICAO>.sql` (when `--sql` is passed): Executable spatial SQL insert script for PostGIS / SQLite.
+* `manifest.json`: Catalog index summarizing feature counts, runways, taxiways, stands, and audit compliance scores.
+
+---
+
 ## Windows Laptop Step-by-Step Setup Guide
 
 Follow these steps to run the complete stack on a Windows 10/11 laptop.

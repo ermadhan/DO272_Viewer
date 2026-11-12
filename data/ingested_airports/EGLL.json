@@ -1,0 +1,907 @@
+{
+  "icao": "EGLL",
+  "iata": "LHR",
+  "name": "London Heathrow Airport",
+  "city": "London",
+  "country": "United Kingdom",
+  "center": [
+    51.47,
+    -0.4543
+  ],
+  "elevationMeters": 25,
+  "magneticVariation": "0.8°W",
+  "transitionAltitudeFt": 6000,
+  "source": "Curated Hub (DO-272/ED-99)",
+  "features": [
+    {
+      "id": "LHR-RWY-09L-27R",
+      "aerodromeId": "EGLL",
+      "featureClass": "RunwayElement",
+      "designator": "09L/27R",
+      "status": "Active",
+      "lengthMeters": 3902,
+      "widthMeters": 50,
+      "trueHeading": 269,
+      "surface": "Grooved Asphalt",
+      "pcnRating": "120/F/A/W/T",
+      "ilsCat": "CAT IIIb",
+      "elevationMeters": 24.5,
+      "coordinates": [
+        [
+          51.47785,
+          -0.488
+        ],
+        [
+          51.47785,
+          -0.432
+        ],
+        [
+          51.47735,
+          -0.432
+        ],
+        [
+          51.47735,
+          -0.488
+        ]
+      ]
+    },
+    {
+      "id": "LHR-RWY-09R-27L",
+      "aerodromeId": "EGLL",
+      "featureClass": "RunwayElement",
+      "designator": "09R/27L",
+      "status": "Active",
+      "lengthMeters": 3660,
+      "widthMeters": 50,
+      "trueHeading": 269,
+      "surface": "Grooved Asphalt",
+      "pcnRating": "115/F/A/W/T",
+      "ilsCat": "CAT IIIb",
+      "elevationMeters": 23.5,
+      "coordinates": [
+        [
+          51.46535,
+          -0.485
+        ],
+        [
+          51.46535,
+          -0.433
+        ],
+        [
+          51.46485,
+          -0.433
+        ],
+        [
+          51.46485,
+          -0.485
+        ]
+      ]
+    },
+    {
+      "id": "LHR-THR-27R",
+      "aerodromeId": "EGLL",
+      "featureClass": "RunwayThreshold",
+      "designator": "THR 27R",
+      "status": "Active",
+      "elevationMeters": 24.5,
+      "trueHeading": 269,
+      "surface": "Grooved Asphalt",
+      "pcnRating": "120/F/A/W/T",
+      "properties": {
+        "lighting": "Green Threshold Lights"
+      },
+      "coordinates": [
+        [
+          51.47785,
+          -0.4345
+        ],
+        [
+          51.47735,
+          -0.4345
+        ]
+      ]
+    },
+    {
+      "id": "LHR-THR-09L",
+      "aerodromeId": "EGLL",
+      "featureClass": "RunwayThreshold",
+      "designator": "THR 09L",
+      "status": "Active",
+      "elevationMeters": 24,
+      "trueHeading": 89,
+      "surface": "Grooved Asphalt",
+      "pcnRating": "120/F/A/W/T",
+      "properties": {
+        "lighting": "Green Threshold Lights"
+      },
+      "coordinates": [
+        [
+          51.47785,
+          -0.485
+        ],
+        [
+          51.47735,
+          -0.485
+        ]
+      ]
+    },
+    {
+      "id": "LHR-THR-27L",
+      "aerodromeId": "EGLL",
+      "featureClass": "RunwayThreshold",
+      "designator": "THR 27L",
+      "status": "Active",
+      "elevationMeters": 23.5,
+      "trueHeading": 269,
+      "surface": "Grooved Asphalt",
+      "pcnRating": "115/F/A/W/T",
+      "properties": {
+        "lighting": "Green Threshold Lights"
+      },
+      "coordinates": [
+        [
+          51.46535,
+          -0.435
+        ],
+        [
+          51.46485,
+          -0.435
+        ]
+      ]
+    },
+    {
+      "id": "LHR-THR-09R",
+      "aerodromeId": "EGLL",
+      "featureClass": "RunwayThreshold",
+      "designator": "THR 09R",
+      "status": "Active",
+      "elevationMeters": 23,
+      "trueHeading": 89,
+      "surface": "Grooved Asphalt",
+      "pcnRating": "115/F/A/W/T",
+      "properties": {
+        "lighting": "Green Threshold Lights"
+      },
+      "coordinates": [
+        [
+          51.46535,
+          -0.482
+        ],
+        [
+          51.46485,
+          -0.482
+        ]
+      ]
+    },
+    {
+      "id": "LHR-BLAST-27R",
+      "aerodromeId": "EGLL",
+      "featureClass": "RunwayBlastPad",
+      "designator": "Blast Pad RWY 27R",
+      "status": "Active",
+      "lengthMeters": 180,
+      "widthMeters": 50,
+      "surface": "Asphalt",
+      "coordinates": [
+        [
+          51.47785,
+          -0.432
+        ],
+        [
+          51.47785,
+          -0.4345
+        ],
+        [
+          51.47735,
+          -0.4345
+        ],
+        [
+          51.47735,
+          -0.432
+        ]
+      ]
+    },
+    {
+      "id": "LHR-BLAST-27L",
+      "aerodromeId": "EGLL",
+      "featureClass": "RunwayBlastPad",
+      "designator": "Blast Pad RWY 27L",
+      "status": "Active",
+      "lengthMeters": 140,
+      "widthMeters": 50,
+      "surface": "Asphalt",
+      "coordinates": [
+        [
+          51.46535,
+          -0.433
+        ],
+        [
+          51.46535,
+          -0.435
+        ],
+        [
+          51.46485,
+          -0.435
+        ],
+        [
+          51.46485,
+          -0.433
+        ]
+      ]
+    },
+    {
+      "id": "LHR-TWY-A",
+      "aerodromeId": "EGLL",
+      "featureClass": "TaxiwayElement",
+      "designator": "Alpha (Northern Parallel)",
+      "status": "Active",
+      "surface": "Asphalt",
+      "widthMeters": 30,
+      "coordinates": [
+        [
+          51.4763,
+          -0.486
+        ],
+        [
+          51.4763,
+          -0.434
+        ],
+        [
+          51.4757,
+          -0.434
+        ],
+        [
+          51.4757,
+          -0.486
+        ]
+      ]
+    },
+    {
+      "id": "LHR-TWY-B",
+      "aerodromeId": "EGLL",
+      "featureClass": "TaxiwayElement",
+      "designator": "Bravo (Northern Inner)",
+      "status": "Active",
+      "surface": "Asphalt",
+      "widthMeters": 30,
+      "coordinates": [
+        [
+          51.4751,
+          -0.486
+        ],
+        [
+          51.4751,
+          -0.434
+        ],
+        [
+          51.4745,
+          -0.434
+        ],
+        [
+          51.4745,
+          -0.486
+        ]
+      ]
+    },
+    {
+      "id": "LHR-TWY-L",
+      "aerodromeId": "EGLL",
+      "featureClass": "TaxiwayElement",
+      "designator": "Lima (Southern Parallel)",
+      "status": "Active",
+      "surface": "Asphalt",
+      "widthMeters": 30,
+      "coordinates": [
+        [
+          51.4668,
+          -0.483
+        ],
+        [
+          51.4668,
+          -0.434
+        ],
+        [
+          51.4662,
+          -0.434
+        ],
+        [
+          51.4662,
+          -0.483
+        ]
+      ]
+    },
+    {
+      "id": "LHR-TWY-T5",
+      "aerodromeId": "EGLL",
+      "featureClass": "TaxiwayElement",
+      "designator": "Terminal 5 Apron Taxiway",
+      "status": "Active",
+      "surface": "Concrete",
+      "widthMeters": 35,
+      "coordinates": [
+        [
+          51.4735,
+          -0.488
+        ],
+        [
+          51.47,
+          -0.488
+        ],
+        [
+          51.47,
+          -0.4865
+        ],
+        [
+          51.4735,
+          -0.4865
+        ]
+      ]
+    },
+    {
+      "id": "LHR-TGL-A",
+      "aerodromeId": "EGLL",
+      "featureClass": "TaxiwayGuidanceLine",
+      "designator": "TGL-Alpha",
+      "status": "Active",
+      "isReversible": true,
+      "maxWingspanMeters": 80,
+      "coordinates": [
+        [
+          51.476,
+          -0.486
+        ],
+        [
+          51.476,
+          -0.46
+        ],
+        [
+          51.476,
+          -0.436
+        ]
+      ]
+    },
+    {
+      "id": "LHR-TGL-B",
+      "aerodromeId": "EGLL",
+      "featureClass": "TaxiwayGuidanceLine",
+      "designator": "TGL-Bravo",
+      "status": "Active",
+      "isReversible": true,
+      "coordinates": [
+        [
+          51.4748,
+          -0.486
+        ],
+        [
+          51.4748,
+          -0.46
+        ],
+        [
+          51.4748,
+          -0.436
+        ]
+      ]
+    },
+    {
+      "id": "LHR-TGL-L",
+      "aerodromeId": "EGLL",
+      "featureClass": "TaxiwayGuidanceLine",
+      "designator": "TGL-Lima",
+      "status": "Active",
+      "isReversible": true,
+      "coordinates": [
+        [
+          51.4665,
+          -0.483
+        ],
+        [
+          51.4665,
+          -0.46
+        ],
+        [
+          51.4665,
+          -0.436
+        ]
+      ]
+    },
+    {
+      "id": "LHR-TGL-T5-NORTH",
+      "aerodromeId": "EGLL",
+      "featureClass": "TaxiwayGuidanceLine",
+      "designator": "TGL-T5-North-Connector",
+      "status": "Active",
+      "isReversible": true,
+      "coordinates": [
+        [
+          51.476,
+          -0.486
+        ],
+        [
+          51.4748,
+          -0.486
+        ],
+        [
+          51.472,
+          -0.487
+        ]
+      ]
+    },
+    {
+      "id": "LHR-TGL-T5-SOUTH",
+      "aerodromeId": "EGLL",
+      "featureClass": "TaxiwayGuidanceLine",
+      "designator": "TGL-T5-South-Connector",
+      "status": "Active",
+      "isReversible": true,
+      "coordinates": [
+        [
+          51.472,
+          -0.487
+        ],
+        [
+          51.4685,
+          -0.487
+        ],
+        [
+          51.4665,
+          -0.483
+        ]
+      ]
+    },
+    {
+      "id": "LHR-TGL-LINK-A10",
+      "aerodromeId": "EGLL",
+      "featureClass": "TaxiwayGuidanceLine",
+      "designator": "TGL-Link-A10-27R",
+      "status": "Active",
+      "isReversible": true,
+      "coordinates": [
+        [
+          51.476,
+          -0.436
+        ],
+        [
+          51.477,
+          -0.435
+        ]
+      ]
+    },
+    {
+      "id": "LHR-TGL-LINK-L10",
+      "aerodromeId": "EGLL",
+      "featureClass": "TaxiwayGuidanceLine",
+      "designator": "TGL-Link-L10-27L",
+      "status": "Active",
+      "isReversible": true,
+      "coordinates": [
+        [
+          51.4665,
+          -0.436
+        ],
+        [
+          51.4655,
+          -0.435
+        ]
+      ]
+    },
+    {
+      "id": "LHR-TGL-CENTRAL",
+      "aerodromeId": "EGLL",
+      "featureClass": "TaxiwayGuidanceLine",
+      "designator": "TGL-Central-Apron",
+      "status": "Active",
+      "isReversible": true,
+      "coordinates": [
+        [
+          51.4748,
+          -0.46
+        ],
+        [
+          51.4715,
+          -0.454
+        ],
+        [
+          51.4665,
+          -0.46
+        ]
+      ]
+    },
+    {
+      "id": "LHR-STAND-501",
+      "aerodromeId": "EGLL",
+      "featureClass": "ParkingStandArea",
+      "designator": "Stand 501",
+      "standNumber": "501",
+      "terminal": "Terminal 5A",
+      "status": "Active",
+      "icaoCodeLetter": "F",
+      "hasJetBridge": true,
+      "coordinates": [
+        [
+          51.4712,
+          -0.4885
+        ],
+        [
+          51.4718,
+          -0.4885
+        ],
+        [
+          51.4718,
+          -0.4875
+        ],
+        [
+          51.4712,
+          -0.4875
+        ]
+      ]
+    },
+    {
+      "id": "LHR-STAND-502",
+      "aerodromeId": "EGLL",
+      "featureClass": "ParkingStandArea",
+      "designator": "Stand 502",
+      "standNumber": "502",
+      "terminal": "Terminal 5A",
+      "status": "Active",
+      "icaoCodeLetter": "E",
+      "hasJetBridge": true,
+      "coordinates": [
+        [
+          51.472,
+          -0.4885
+        ],
+        [
+          51.4726,
+          -0.4885
+        ],
+        [
+          51.4726,
+          -0.4875
+        ],
+        [
+          51.472,
+          -0.4875
+        ]
+      ]
+    },
+    {
+      "id": "LHR-STAND-201",
+      "aerodromeId": "EGLL",
+      "featureClass": "ParkingStandArea",
+      "designator": "Stand 201",
+      "standNumber": "201",
+      "terminal": "Terminal 2",
+      "status": "Active",
+      "icaoCodeLetter": "E",
+      "hasJetBridge": true,
+      "coordinates": [
+        [
+          51.471,
+          -0.453
+        ],
+        [
+          51.4716,
+          -0.453
+        ],
+        [
+          51.4716,
+          -0.452
+        ],
+        [
+          51.471,
+          -0.452
+        ]
+      ]
+    },
+    {
+      "id": "LHR-STAND-202",
+      "aerodromeId": "EGLL",
+      "featureClass": "ParkingStandArea",
+      "designator": "Stand 202",
+      "standNumber": "202",
+      "terminal": "Terminal 2",
+      "status": "Active",
+      "icaoCodeLetter": "E",
+      "hasJetBridge": true,
+      "coordinates": [
+        [
+          51.4718,
+          -0.453
+        ],
+        [
+          51.4724,
+          -0.453
+        ],
+        [
+          51.4724,
+          -0.452
+        ],
+        [
+          51.4718,
+          -0.452
+        ]
+      ]
+    },
+    {
+      "id": "LHR-SGL-501",
+      "aerodromeId": "EGLL",
+      "featureClass": "StandGuidanceLine",
+      "designator": "Lead-in Stand 501",
+      "status": "Active",
+      "coordinates": [
+        [
+          51.472,
+          -0.487
+        ],
+        [
+          51.4715,
+          -0.488
+        ]
+      ]
+    },
+    {
+      "id": "LHR-SGL-502",
+      "aerodromeId": "EGLL",
+      "featureClass": "StandGuidanceLine",
+      "designator": "Lead-in Stand 502",
+      "status": "Active",
+      "coordinates": [
+        [
+          51.472,
+          -0.487
+        ],
+        [
+          51.4723,
+          -0.488
+        ]
+      ]
+    },
+    {
+      "id": "LHR-SGL-201",
+      "aerodromeId": "EGLL",
+      "featureClass": "StandGuidanceLine",
+      "designator": "Lead-in Stand 201",
+      "status": "Active",
+      "coordinates": [
+        [
+          51.4715,
+          -0.454
+        ],
+        [
+          51.4713,
+          -0.4525
+        ]
+      ]
+    },
+    {
+      "id": "LHR-SGL-202",
+      "aerodromeId": "EGLL",
+      "featureClass": "StandGuidanceLine",
+      "designator": "Lead-in Stand 202",
+      "status": "Active",
+      "coordinates": [
+        [
+          51.4715,
+          -0.454
+        ],
+        [
+          51.4721,
+          -0.4525
+        ]
+      ]
+    },
+    {
+      "id": "LHR-PBB-501",
+      "aerodromeId": "EGLL",
+      "featureClass": "PassengerBoardingBridge",
+      "designator": "PBB-501-A380",
+      "status": "Active",
+      "coordinates": [
+        [
+          51.4715,
+          -0.4882
+        ],
+        [
+          51.4715,
+          -0.4886
+        ]
+      ]
+    },
+    {
+      "id": "LHR-HOLD-27R",
+      "aerodromeId": "EGLL",
+      "featureClass": "RunwayHoldingPosition",
+      "designator": "HOLD RWY 27R @ A10",
+      "status": "Active",
+      "holdingCategory": "CAT III",
+      "coordinates": [
+        51.4768,
+        -0.4355
+      ]
+    },
+    {
+      "id": "LHR-HOLD-09L",
+      "aerodromeId": "EGLL",
+      "featureClass": "RunwayHoldingPosition",
+      "designator": "HOLD RWY 09L @ A1",
+      "status": "Active",
+      "holdingCategory": "CAT III",
+      "coordinates": [
+        51.4768,
+        -0.4845
+      ]
+    },
+    {
+      "id": "LHR-HOLD-27L",
+      "aerodromeId": "EGLL",
+      "featureClass": "RunwayHoldingPosition",
+      "designator": "HOLD RWY 27L @ L10",
+      "status": "Active",
+      "holdingCategory": "CAT III",
+      "coordinates": [
+        51.4658,
+        -0.4355
+      ]
+    },
+    {
+      "id": "LHR-HOLD-09R",
+      "aerodromeId": "EGLL",
+      "featureClass": "RunwayHoldingPosition",
+      "designator": "HOLD RWY 09R @ L1",
+      "status": "Active",
+      "holdingCategory": "CAT III",
+      "coordinates": [
+        51.4658,
+        -0.4815
+      ]
+    },
+    {
+      "id": "LHR-HS-1",
+      "aerodromeId": "EGLL",
+      "featureClass": "HotSpot",
+      "designator": "HS-1 (Link 1 Crossing)",
+      "status": "Active",
+      "hotspotSeverity": "High",
+      "associatedRunway": "09L/27R",
+      "hazardDescription": "Holding short point for Link 1 crossing Runway 09L. Heavy arrival waves.",
+      "coordinates": [
+        [
+          51.4755,
+          -0.487
+        ],
+        [
+          51.4772,
+          -0.487
+        ],
+        [
+          51.4772,
+          -0.483
+        ],
+        [
+          51.4755,
+          -0.483
+        ]
+      ]
+    },
+    {
+      "id": "LHR-HS-2",
+      "aerodromeId": "EGLL",
+      "featureClass": "HotSpot",
+      "designator": "HS-2 (Block 85 Apron Transition)",
+      "status": "Active",
+      "hotspotSeverity": "Medium",
+      "associatedRunway": "All",
+      "hazardDescription": "High density taxiway junction between Terminal 2 and Terminal 3 aprons.",
+      "coordinates": [
+        [
+          51.4695,
+          -0.458
+        ],
+        [
+          51.4715,
+          -0.458
+        ],
+        [
+          51.4715,
+          -0.454
+        ],
+        [
+          51.4695,
+          -0.454
+        ]
+      ]
+    },
+    {
+      "id": "LHR-VS-TOWER",
+      "aerodromeId": "EGLL",
+      "featureClass": "VerticalStructure",
+      "designator": "Heathrow Visual Control Tower",
+      "structureType": "Control Tower",
+      "status": "Active",
+      "heightAglMeters": 87,
+      "elevationAmslMeters": 112,
+      "frangible": false,
+      "lightingType": "High-Intensity White",
+      "coordinates": [
+        51.4705,
+        -0.4542
+      ]
+    },
+    {
+      "id": "LHR-VS-T5",
+      "aerodromeId": "EGLL",
+      "featureClass": "VerticalStructure",
+      "designator": "Terminal 5 Main Concourse",
+      "structureType": "Terminal Building",
+      "status": "Active",
+      "heightAglMeters": 39.5,
+      "elevationAmslMeters": 64.5,
+      "frangible": false,
+      "lightingType": "Medium Red Strobe",
+      "coordinates": [
+        51.472,
+        -0.4895
+      ]
+    },
+    {
+      "id": "LHR-VOR",
+      "aerodromeId": "EGLL",
+      "featureClass": "DistanceMeasuringEquipment",
+      "designator": "LON VOR/DME (113.60 MHz)",
+      "status": "Active",
+      "frequency": "113.60 MHz",
+      "coordinates": [
+        51.472,
+        -0.451
+      ]
+    },
+    {
+      "id": "LHR-LOC-27R",
+      "aerodromeId": "EGLL",
+      "featureClass": "LocalizerAntenna",
+      "designator": "I-WW (LOC 27R)",
+      "status": "Active",
+      "frequency": "109.5 MHz",
+      "coordinates": [
+        51.4776,
+        -0.49
+      ]
+    },
+    {
+      "id": "LHR-GS-27R",
+      "aerodromeId": "EGLL",
+      "featureClass": "GlidePathAntenna",
+      "designator": "I-WW (GS 27R)",
+      "status": "Active",
+      "frequency": "332.6 MHz",
+      "coordinates": [
+        51.4772,
+        -0.438
+      ]
+    },
+    {
+      "id": "LHR-PAPI-27R",
+      "aerodromeId": "EGLL",
+      "featureClass": "VisualGlideSlopeIndicator",
+      "designator": "PAPI 27R (3.0 Degree Slope)",
+      "status": "Active",
+      "channelSlopeDeg": 3,
+      "coordinates": [
+        51.4772,
+        -0.439
+      ]
+    },
+    {
+      "id": "LHR-BEACON",
+      "aerodromeId": "EGLL",
+      "featureClass": "AirportBeacon",
+      "designator": "Heathrow Airport Rotating Beacon",
+      "status": "Active",
+      "elevationMeters": 112,
+      "coordinates": [
+        51.4706,
+        -0.454
+      ]
+    }
+  ]
+}

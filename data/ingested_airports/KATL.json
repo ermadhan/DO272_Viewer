@@ -1,0 +1,173 @@
+{
+  "icao": "KATL",
+  "iata": "ATL",
+  "name": "Hartsfield\u2013Jackson Atlanta International Airport",
+  "city": "Atlanta",
+  "country": "United States",
+  "center": [
+    33.6407,
+    -84.4277
+  ],
+  "elevationMeters": 15.0,
+  "magneticVariation": "2.4\u00b0W",
+  "transitionAltitudeFt": 18000,
+  "source": "Curated Hub (DO-272/ED-99)",
+  "features": [
+    {
+      "id": "KATL-RWY-09L-27R",
+      "aerodromeId": "KATL",
+      "featureClass": "RunwayElement",
+      "designator": "09L/27R",
+      "status": "Active",
+      "lengthMeters": 3600,
+      "widthMeters": 60,
+      "surface": "Concrete",
+      "pcnRating": "115/R/B/W/T",
+      "coordinates": [
+        [
+          33.6344,
+          -84.4367
+        ],
+        [
+          33.6464,
+          -84.4187
+        ],
+        [
+          33.647000000000006,
+          -84.4187
+        ],
+        [
+          33.635000000000005,
+          -84.4367
+        ],
+        [
+          33.6344,
+          -84.4367
+        ]
+      ]
+    },
+    {
+      "id": "KATL-RWY-09R-27L",
+      "aerodromeId": "KATL",
+      "featureClass": "RunwayElement",
+      "designator": "09R/27L",
+      "status": "Active",
+      "lengthMeters": 3200,
+      "widthMeters": 45,
+      "surface": "Asphalt",
+      "pcnRating": "98/F/A/W/T",
+      "coordinates": [
+        [
+          33.630700000000004,
+          -84.4367
+        ],
+        [
+          33.642700000000005,
+          -84.4187
+        ],
+        [
+          33.6433,
+          -84.4187
+        ],
+        [
+          33.6313,
+          -84.4367
+        ],
+        [
+          33.630700000000004,
+          -84.4367
+        ]
+      ]
+    },
+    {
+      "id": "KATL-TGL-A",
+      "aerodromeId": "KATL",
+      "featureClass": "TaxiwayGuidanceLine",
+      "designator": "TGL-Alpha",
+      "status": "Active",
+      "isReversible": true,
+      "coordinates": [
+        [
+          33.6359,
+          -84.4367
+        ],
+        [
+          33.6407,
+          -84.4277
+        ],
+        [
+          33.6479,
+          -84.4187
+        ]
+      ]
+    },
+    {
+      "id": "KATL-TGL-B",
+      "aerodromeId": "KATL",
+      "featureClass": "TaxiwayGuidanceLine",
+      "designator": "TGL-Bravo",
+      "status": "Active",
+      "isReversible": true,
+      "coordinates": [
+        [
+          33.6327,
+          -84.4367
+        ],
+        [
+          33.6387,
+          -84.4277
+        ],
+        [
+          33.6447,
+          -84.4187
+        ]
+      ]
+    },
+    {
+      "id": "KATL-STAND-1",
+      "aerodromeId": "KATL",
+      "featureClass": "ParkingStandArea",
+      "designator": "Gate 1",
+      "standNumber": "1",
+      "status": "Active",
+      "coordinates": [
+        [
+          33.6432,
+          -84.4295
+        ],
+        [
+          33.643800000000006,
+          -84.4295
+        ],
+        [
+          33.643800000000006,
+          -84.4289
+        ],
+        [
+          33.6432,
+          -84.4289
+        ],
+        [
+          33.6432,
+          -84.4295
+        ]
+      ]
+    },
+    {
+      "id": "KATL-VS-TOWER",
+      "aerodromeId": "KATL",
+      "featureClass": "VerticalStructure",
+      "designator": "Hartsfield\u2013Jackson Atlanta International Airport Control Tower",
+      "structureType": "Control Tower",
+      "status": "Active",
+      "heightAglMeters": 78.0,
+      "elevationAmslMeters": 93.0,
+      "frangible": false,
+      "lightingType": "High-Intensity White",
+      "coordinates": [
+        33.6447,
+        -84.4277
+      ]
+    }
+  ]
+}

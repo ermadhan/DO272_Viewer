@@ -1,0 +1,299 @@
+# RTCA DO-272 / EUROCAE ED-99 Aerodrome Spatial GIS & Model Context Protocol (MCP) Platform
+
+A standards-compliant aeronautical GIS visualization, spatial engineering, and Model Context Protocol (MCP) intelligence platform conforming to **RTCA DO-272 / EUROCAE ED-99** (Aeronautical Information Conceptual Model - AMDB) and **FAA AC 150/5300-18B / ICAO Annex 14** specifications.
+
+---
+
+## Table of Contents
+1. [Overview & Key Capabilities](#overview--key-capabilities)
+2. [Supported Aerodromes](#supported-aerodromes)
+3. [Architecture & Technology Stack](#architecture--technology-stack)
+4. [DO-272 Features & Spatial Analysis Modules](#do-272-features--spatial-analysis-modules)
+5. [Model Context Protocol (MCP) Architecture](#model-context-protocol-mcp-architecture)
+6. [Windows Laptop Step-by-Step Setup Guide](#windows-laptop-step-by-step-setup-guide)
+7. [Running the Automated Test Suites](#running-the-automated-test-suites)
+8. [Connecting External AI Clients (Claude Desktop / Cursor)](#connecting-external-ai-clients-claude-desktop--cursor)
+
+---
+
+## Overview & Key Capabilities
+
+* **Interactive Aeronautical Map**: 2D Leaflet GIS canvas with sub-meter runway geometry, displaced thresholds, blast pads, taxiway centerlines, CAT III hold-short markings, stand lead-in lines, incursion hot spots, and NAVAIDs.
+* **Autonomous In-App MCP AI Agent Client**: Conversational AI assistant with strategy/thought traces, JSON-RPC 2.0 tool execution inspection, and one-click "Sync & View on Map" actions.
+* **Python stdio MCP Server**: Standard Model Context Protocol server (`python_backend/mcp_server.py`) exposing DO-272 spatial analysis capabilities to Claude Desktop, Cursor, or external LLM workflows.
+* **Automated DO-272 Data Quality Requirement (DQR) Audits**: Geometry closure checks, duplicate vertex filtering, 5-part ICAO PCN syntax validation, hold-line setback verification, and stand connectivity scoring.
+* **Dijkstra Ground Taxiway Routing**: Graph pathfinding over connected `TaxiwayGuidanceLine` networks with turn-by-turn ATC taxi clearances and hot spot crossing alerts.
+* **3D FAA Part 77 Obstacle Clearance Evaluation**: Evaluates vertical structures against 1:50 approach and 1:7 transitional clearance surfaces with exact margin or penetration metrics.
+* **Dual Database Dialect Replication**: Exact schema replication and live spatial query runner for **PostgreSQL 16 + PostGIS 3.4** and **SQLite 3 + SpatiaLite**.
+* **Worldwide Open Data Ingestion**: Live Overpass API ingestion querying and classifying real-world aerodromes from OpenStreetMap worldwide (e.g. KJFK, KLAX, EHAM, LFPG, RJTT, WSSS) or custom FAA 18B GeoJSON.
+
+---
+
+## Supported Aerodromes
+
+| Aerodrome | ICAO / IATA | Geometry & Standard | Features Highlights |
+| :--- | :---: | :---: | :--- |
+| **San Francisco International** | `KSFO` / `SFO` | FAA NASR / DO-272 Curated | Intersecting 28L/10R & 01L/19R pairs, CAT III hold lines on TWY A/B, Concourses A/G stands, Safedock T1-24 lead-in lines, Control Tower (67.4m). |
+| **London Heathrow** | `EGLL` / `LHR` | Eurocontrol AMDB / ED-99 | Dual parallel 09L/27R & 09R/27L, PCN 120/R/B/W/T, Terminal 5 / Stand 501 lead-in system, Central Tower (87m). |
+| **Frankfurt Main** | `EDDF` / `FRA` | Eurocontrol AMDB / ED-99 | Dual parallel + Runway 18 West, dual-spine TWY November & Papa with mid/east connectors, Terminal 1 & 2 stands. |
+| **Dubai International** | `OMDB` / `DXB` | Curated DO-272 Hub | Dual parallel Code F A380 runways (12L/30R), Concourse A gates, Apron N to TWY Mike guidance spine, ASDE radar. |
+| **Worldwide Live Hubs** | *Any ICAO* | OpenStreetMap Overpass Ingest | Live Overpass API extraction around 4.5km bounding radius for any airport worldwide (KJFK, KLAX, EHAM, LFPG, etc.). |
+
+---
+
+## Architecture & Technology Stack
+
+```
++---------------------------------------------------------------------------------+
+|                       Vite React 19 Frontend (SPA)                              |
+|  - Leaflet 2D GIS Map (13 subsystem layers)                                     |
+|  - AI Agent Client Tab (MCPAgentChat: Strategy reasoning & Map Sync)             |
+|  - MCP Studio (Live Tool Tester, Spec Inspector, Config Generator)              |
+|  - Spatial Analysis HUD (Dijkstra Routing, Part 77 3D Obstacles, PostGIS SQL)   |
+|  - DO-272 43 Feature Class Explorer & Catalogue                                 |
++---------------------------------------------------------------------------------+
+                                       |
+                   JSON-RPC 2.0 over stdio / WebSocket
+                                       v
++---------------------------------------------------------------------------------+
+|                 DO-272 Model Context Protocol (MCP) Server                     |
+|                   python_backend/mcp_server.py (stdio)                          |
+|                                                                                 |
+|  1. do272_validate_compliance       - DQR boundary, PCN & setback audit         |
+|  2. do272_find_taxi_route           - Dijkstra shortest ground path solver      |
+|  3. do272_obstacle_clearance_check  - 3D Part 77 / ICAO Annex 14 evaluation     |
+|  4. do272_query_features            - Subsystem spatial element inspection      |
+|  5. do272_spatial_sql               - Parameterized PostGIS / SQLite query      |
++---------------------------------------------------------------------------------+
+                                       |
+                    PostGIS Spatial Geometry & Graph Math
+                                       v
++---------------------------------------------------------------------------------+
+|        Database Storage: PostgreSQL 16 + PostGIS 3.4  /  SQLite + SpatiaLite    |
++---------------------------------------------------------------------------------+
+```
+
+---
+
+## DO-272 Features & Spatial Analysis Modules
+
+### 1. RTCA DO-272 43-Feature Data Dictionary
+The platform supports all 43 spatial aerodrome features across 6 functional subsystems:
+* **Runway Features**: `RunwayElement`, `RunwayThreshold`, `RunwayDisplacedThreshold`, `RunwayBlastPad`, `Stopway`, `Clearway`, `RunwayIntersection`.
+* **Taxiway Features**: `TaxiwayElement`, `TaxiwayGuidanceLine`, `RunwayHoldingPosition`, `IntermediateHoldingPosition`, `TaxiwayIntersection`, `DeicingPadArea`.
+* **Apron & Parking Features**: `ApronElement`, `ParkingStandArea`, `StandGuidanceLine`, `PassengerBoardingBridge`, `ServiceRoad`, `Helipad`.
+* **Safety & Protection Zones**: `RunwaySafetyArea`, `ObjectFreeArea`, `ObstacleFreeZone`, `RunwayProtectionZone`, `HotSpot`.
+* **Vertical Structures & Obstacles**: `VerticalStructure` (Towers, Hangars, Cranes, Blast Deflectors) with frangibility and elevation attributes.
+* **NAVAIDs & Sensor Equipment**: `LocalizerAntenna`, `GlideSlopeAntenna`, `PAPI`, `VORStation`, `AirportBeacon`, `RadarSurveillanceSensor`.
+
+### 2. Autonomous DO-272 Compliance Validation
+Validates datasets against 7 safety-critical compliance rules:
+* **DO272-GEOM-001**: Polygon boundary planar closure (first coordinate equals last coordinate).
+* **DO272-GEOM-002**: Topological cleanliness (no redundant zero-length consecutive duplicate edges).
+* **DO272-ATTR-001**: 5-part ICAO Annex 14 / FAA AC 150/5335-5 PCN rating syntax verification (`[0-9]+/([RF])/([ABCD])/([WXYZ])/([TU])`).
+* **DO272-ATTR-002**: Feature designator uniqueness within spatial class.
+* **DO272-NET-001**: Runway holding position physical setback from active runway polygons (must be between 40m and 120m; flags runway strip encroachment).
+* **DO272-NET-002**: Parking stand lead-in connectivity (stand must be within 100m of a guidance line; flags missing `StandGuidanceLine`).
+* **DO272-SAFE-001**: Obstacle frangibility within 120m of active runway centerlines.
+
+---
+
+## Model Context Protocol (MCP) Architecture
+
+The platform provides a dual-surface MCP environment:
+
+1. **In-App AI Agent Client (`src/components/MCPAgentChat.tsx`)**:
+   * A full conversational chat client directly in the browser.
+   * Dispatches queries to DO-272 tools with real-time JSON-RPC 2.0 telemetry.
+   * Features collapsible **Strategy & Reasoning Traces**, payload inspectors, and **"Sync & View on Map"** buttons.
+
+2. **Standalone Python MCP Server (`python_backend/mcp_server.py`)**:
+   * Standard stdio transport compliant with the Model Context Protocol specification.
+   * Can be added directly to Claude Desktop, Cursor, or any MCP-compatible client.
+
+---
+
+## Windows Laptop Step-by-Step Setup Guide
+
+Follow these steps to run the complete stack on a Windows 10/11 laptop.
+
+### Prerequisites
+1. **Node.js 18+ (LTS)**: Download and install from [nodejs.org](https://nodejs.org/).
+2. **Python 3.10+**: Download from [python.org](https://www.python.org/).  
+   *(Make sure to check the box: **"Add python.exe to PATH"** during installation!)*
+3. **Git for Windows**: Download from [git-scm.com](https://git-scm.com/).
+4. *(Optional for local database)* **Docker Desktop for Windows** or native **PostgreSQL 16 + PostGIS 3.4**.
+
+---
+
+### Step 1: Clone the Repository
+Open PowerShell or Command Prompt:
+```cmd
+git clone <repository-url>
+cd do272-aerodrome-gis
+```
+
+---
+
+### Step 2: Set Up and Run the Frontend
+Install Node.js dependencies and start the Vite development server:
+```cmd
+npm install
+npm run dev
+```
+The application will be accessible at:  
+👉 **`http://localhost:3000`**
+
+---
+
+### Step 3: Set Up and Run the Python Backend & MCP Server
+Open a second Command Prompt or PowerShell window in the project folder:
+```cmd
+cd python_backend
+```
+
+#### Option A: Quick-Start via Batch File
+Double-click or run:
+```cmd
+start_backend.bat
+```
+This batch script will automatically:
+1. Verify Python is installed in PATH.
+2. Create a clean virtual environment (`venv`).
+3. Activate the virtual environment.
+4. Install all packages from `requirements.txt` (FastAPI, uvicorn, Shapely, GeoAlchemy2, MCP SDK, psycopg2).
+5. Start the backend service.
+
+#### Option B: Manual Setup via Command Prompt
+```cmd
+python -m venv venv
+call venv\Scripts\activate
+pip install -r requirements.txt
+python main.py
+```
+
+To run the MCP server in standalone stdio mode:
+```cmd
+call venv\Scripts\activate
+python mcp_server.py
+```
+
+---
+
+### Step 4: (Optional) Run Local PostgreSQL + PostGIS via Docker
+To run a local PostGIS database on port 5432:
+```cmd
+cd python_backend
+docker compose up -d
+```
+Default connection string:
+```
+postgresql://postgres:postgrespassword@localhost:5432/do272_aerodromes
+```
+
+---
+
+## Running the Automated Test Suites
+
+The project includes two independent end-to-end test suites.
+
+### 1. Python stdio MCP Client Test Suite
+Tests tool discovery (`tools/list`), execution of all 5 tools (`tools/call`), and JSON-RPC 2.0 error handling (`-32601`):
+```cmd
+python python_backend/test_mcp_client.py
+```
+*Expected Output*:
+```
+======================================================================
+  DO-272 MODEL CONTEXT PROTOCOL (MCP) CLIENT TEST HARNESS
+  Testing stdio JSON-RPC 2.0 interface on mcp_server.py
+======================================================================
+✅ [PASS] 1. tools/list - Tool Discovery & Registration (86.5ms)
+✅ [PASS] 2. do272_validate_compliance - Quality & DQR Audit (0.5ms)
+✅ [PASS] 3. do272_find_taxi_route - Dijkstra Graph Routing (0.3ms)
+✅ [PASS] 4. do272_obstacle_clearance_check - 3D Part 77 Clearance (0.3ms)
+✅ [PASS] 5. do272_query_features - Spatial Query (0.3ms)
+✅ [PASS] 6. do272_spatial_sql - PostGIS SQL Execution (0.3ms)
+✅ [PASS] 7. Unknown Tool Handling - Error Code -32601 (0.2ms)
+----------------------------------------------------------------------
+Test Suite Summary: 7/7 Passed (100.0%)
+======================================================================
+ALL DO-272 MCP CLIENT TESTS PASSED SUCCESSFULLY! 🚀
+```
+
+### 2. TypeScript In-App MCP Client & Agent E2E Suite
+Validates the in-app autonomous agent reasoning loop, tool parameter generation, and map sync formatting across all 4 hub aerodromes:
+```cmd
+npx tsx tests/mcp-client-e2e.ts
+```
+*Expected Output*:
+```
+======================================================================
+  DO-272 IN-APP MCP CLIENT AGENT E2E TEST SUITE
+======================================================================
+✅ [PASS] Tool Registration Count
+✅ [PASS] All 5 Standard DO-272 MCP Tools Registered
+✅ [PASS] Low-level Audit on KSFO (100% COMPLIANT)
+✅ [PASS] Low-level Part 77 Obstacle Check on KSFO
+✅ [PASS] Low-level Taxiway Graph Routing on KSFO
+✅ [PASS] Low-level Audit on EGLL (100% COMPLIANT)
+✅ [PASS] Low-level Part 77 Obstacle Check on EGLL
+✅ [PASS] Low-level Taxiway Graph Routing on EGLL
+✅ [PASS] Low-level Audit on EDDF (100% COMPLIANT)
+✅ [PASS] Low-level Part 77 Obstacle Check on EDDF
+✅ [PASS] Low-level Taxiway Graph Routing on EDDF
+✅ [PASS] Low-level Audit on OMDB (100% COMPLIANT)
+✅ [PASS] Low-level Part 77 Obstacle Check on OMDB
+✅ [PASS] Low-level Taxiway Graph Routing on OMDB
+✅ [PASS] Agent Intent Dispatch: Audit Prompt selects do272_validate_compliance
+✅ [PASS] Agent Thought Process Generated for Audit
+✅ [PASS] Agent Intent Dispatch: Taxi Prompt selects do272_find_taxi_route
+✅ [PASS] Agent Map Sync Payload correctly attached for Taxi Path
+✅ [PASS] Agent Intent Dispatch: Obstacle Prompt selects do272_obstacle_clearance_check
+✅ [PASS] Agent Intent Dispatch: SQL Prompt selects do272_spatial_sql
+✅ [PASS] MCP Error Handling: Returns JSON-RPC 2.0 error code -32601 for unknown tool
+----------------------------------------------------------------------
+TypeScript Test Suite Summary: 21/21 Passed (100.0%)
+======================================================================
+ALL IN-APP MCP CLIENT TESTS PASSED! 🚀
+```
+
+---
+
+## Connecting External AI Clients (Claude Desktop / Cursor)
+
+You can connect the Python MCP server to desktop LLM tools like Claude Desktop on Windows.
+
+1. Open your Claude Desktop configuration file:
+   ```cmd
+   notepad %APPDATA%\Claude\claude_desktop_config.json
+   ```
+2. Paste the following configuration (replace `C:\\Users\\User\\...` with your actual project directory path):
+   ```json
+   {
+     "mcpServers": {
+       "do272-aerodrome-gis": {
+         "command": "python",
+         "args": [
+           "C:\\path\\to\\do272-aerodrome-gis\\python_backend\\mcp_server.py"
+         ],
+         "env": {
+           "POSTGRES_URL": "postgresql://postgres:postgrespassword@localhost:5432/do272_aerodromes"
+         }
+       }
+     }
+   }
+   ```
+3. Restart Claude Desktop. The hammer icon will appear with access to:
+   * `do272_validate_compliance`
+   * `do272_find_taxi_route`
+   * `do272_obstacle_clearance_check`
+   * `do272_query_features`
+   * `do272_spatial_sql`
+
+---
+
+## License & Standards Citation
+* **RTCA DO-272 / EUROCAE ED-99**: User Requirements for Aerodrome Mapping Information.
+* **FAA Advisory Circular AC 150/5300-18B**: General Guidance and Specifications for Aeronautical Surveys.
+* **ICAO Annex 14**: Aerodromes — Aerodrome Design and Operations.

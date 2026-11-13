@@ -288,7 +288,7 @@ export const DO272FeatureExplorer: React.FC<DO272FeatureExplorerProps> = ({
             <Database className="w-3.5 h-3.5 text-emerald-400" />
             <span className="text-slate-400">Target Schema:</span>
             <span className={databaseEngine === 'postgres' ? 'text-emerald-400 font-bold' : 'text-sky-400 font-bold'}>
-              {databaseEngine === 'postgres' ? 'PostgreSQL (PostGIS)' : 'SQLite (SpatiaLite)'}
+              {databaseEngine === 'postgres' ? 'PostgreSQL' : 'SQLite'}
             </span>
           </div>
 
@@ -653,7 +653,7 @@ export const DO272FeatureExplorer: React.FC<DO272FeatureExplorerProps> = ({
                 RTCA DO-272 / EUROCAE ED-99 Standard Data Dictionary (Showing {filteredCatalog.length} of 43)
               </span>
               <span className="text-sky-400 text-[11px]">
-                Full Database DDL & PostGIS / SpatiaLite Compatibility
+                Database DDL for PostgreSQL and SQLite
               </span>
             </div>
 

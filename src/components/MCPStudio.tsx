@@ -186,10 +186,10 @@ export const MCPStudio: React.FC<MCPStudioProps> = ({ dataset, onSwitchToAgent }
       <div className="flex items-center justify-between pb-4 border-b border-slate-800 shrink-0">
         <div>
           <span className="text-[10px] font-mono text-cyan-400 uppercase tracking-widest block">
-            Model Context Protocol · PostgreSQL Server
+            Model Context Protocol · Database-loaded airport data
           </span>
           <h2 className="text-base font-bold text-white font-mono flex items-center gap-2">
-            <span>DO-272 PostGIS MCP Studio</span>
+            <span>DO-272 MCP Studio</span>
           </h2>
         </div>
 
@@ -276,7 +276,7 @@ export const MCPStudio: React.FC<MCPStudioProps> = ({ dataset, onSwitchToAgent }
                       do272_query_features (DO-272 AMDB Lookup)
                     </option>
                     <option value="do272_spatial_sql">
-                      do272_spatial_sql (PostGIS Spatial SQL)
+                      do272_spatial_sql (Spatial Query Preview)
                     </option>
                   </select>
 
@@ -360,7 +360,7 @@ export const MCPStudio: React.FC<MCPStudioProps> = ({ dataset, onSwitchToAgent }
                     {selectedTool === 'do272_spatial_sql' && (
                       <div>
                         <label className="text-[10px] text-slate-500 uppercase block mb-1">
-                          PostGIS SQL Query:
+                          Spatial Query Preview:
                         </label>
                         <textarea
                           value={sqlParam}
@@ -606,7 +606,7 @@ export const MCPStudio: React.FC<MCPStudioProps> = ({ dataset, onSwitchToAgent }
             <div className="p-3 bg-slate-950 rounded-lg border border-slate-800">
               <div className="font-bold text-sky-400">4. do272_spatial_sql</div>
               <div className="text-slate-300 text-[11px] mt-1">
-                Allows LLM agents to execute parameterized PostGIS spatial queries (ST_Length, ST_Distance, ST_Intersects) on DO-272 database tables with guarded read-only access.
+                Provides a SQL-like preview over the current airport feature dataset loaded from the database.
               </div>
             </div>
           </div>

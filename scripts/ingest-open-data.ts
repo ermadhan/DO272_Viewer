@@ -9,8 +9,11 @@
 import fs from 'fs';
 import path from 'path';
 import { AerodromeDataset, AnyDO272Feature } from '../src/types/do272';
-import { PRELOADED_AERODROMES } from '../src/data/aerodromes';
 import { validateDO272Compliance } from '../src/services/spatialEngine';
+
+const PRELOADED_AERODROMES = JSON.parse(
+  fs.readFileSync(new URL('../python_backend/seed_data/airports.json', import.meta.url), 'utf8')
+) as Record<string, AerodromeDataset>;
 
 interface CliOptions {
   csvFile?: string;
@@ -39,7 +42,7 @@ Options:
   --limit <number>   Limit number of aerodromes to process from the input list
   --output <dir>     Output directory for DO-272 datasets (default: data/ingested_airports)
   --delay <ms>       Delay between live API queries in ms (default: 500)
-  --sql              Generate PostGIS / SQLite SQL insert scripts
+  --sql              Generate SQL insert scripts for the current database schema
   --no-validate      Skip post-ingest DO-272 quality compliance audit
   --help, -h         Display this documentation
 
@@ -531,17 +534,17 @@ async function main() {
     // Optional SQL export
     if (options.exportSql) {
       const sqlPath = path.join(options.outputDir, `${dataset.icao}.sql`);
-      let sqlContent = `-- DO-272 Spatial SQL Inserts for ${dataset.name} (${dataset.icao})\n`;
-      sqlContent += `INSERT INTO do272_aerodromes (icao, iata, name, city, country, center_geom, elevation_m) VALUES ('${dataset.icao}', '${dataset.iata}', '${dataset.name.replace(/'/g, "''")}', '${dataset.city.replace(/'/g, "''")}', '${dataset.country.replace(/'/g, "''")}', ST_SetSRID(ST_MakePoint(${dataset.center[1]}, ${dataset.center[0]}), 4326), ${dataset.elevationMeters}) ON CONFLICT (icao) DO NOTHING;\n\n`;
+      const quoteSql = (value: string) => `'${value.replace(/'/g, "''")}'`;
+      let sqlContent = `-- DO-272 feature data for ${dataset.name} (${dataset.icao})\nBEGIN;\n`;
+      sqlContent += `INSERT INTO do272_aerodromes (icao, iata, name, city, country, center_lat, center_lng, elevation_m, magnetic_variation, transition_altitude_ft, source) VALUES (${quoteSql(dataset.icao)}, ${quoteSql(dataset.iata)}, ${quoteSql(dataset.name)}, ${quoteSql(dataset.city)}, ${quoteSql(dataset.country)}, ${dataset.center[0]}, ${dataset.center[1]}, ${dataset.elevationMeters}, ${quoteSql(dataset.magneticVariation)}, ${dataset.transitionAltitudeFt}, ${quoteSql(dataset.source)}) ON CONFLICT (icao) DO UPDATE SET iata = excluded.iata, name = excluded.name, city = excluded.city, country = excluded.country, center_lat = excluded.center_lat, center_lng = excluded.center_lng, elevation_m = excluded.elevation_m, magnetic_variation = excluded.magnetic_variation, transition_altitude_ft = excluded.transition_altitude_ft, source = excluded.source;\n`;
+      sqlContent += `DELETE FROM do272_features WHERE aerodrome_id = ${quoteSql(dataset.icao)};\n`;
 
-      for (const f of dataset.features) {
-        if (f.featureClass === 'RunwayElement') {
-          const wkt = Array.isArray(f.coordinates[0])
-            ? `POLYGON((${f.coordinates.map((c: any) => `${c[1]} ${c[0]}`).join(', ')}))`
-            : `POINT(${f.coordinates[1]} ${f.coordinates[0]})`;
-          sqlContent += `INSERT INTO do272_runways (id, aerodrome_id, designator, length_m, width_m, geom) VALUES ('${f.id}', '${dataset.icao}', '${f.designator}', ${f.lengthMeters || 3000}, ${f.widthMeters || 45}, ST_GeomFromText('${wkt}', 4326)) ON CONFLICT (id) DO NOTHING;\n`;
-        }
-      }
+      dataset.features.forEach((feature, featureIndex) => {
+        const coordinatesJson = JSON.stringify(feature.coordinates ?? null);
+        const payloadJson = JSON.stringify(feature);
+        sqlContent += `INSERT INTO do272_features (aerodrome_id, id, feature_index, feature_class, designator, coordinates, payload) VALUES (${quoteSql(dataset.icao)}, ${quoteSql(feature.id)}, ${featureIndex}, ${quoteSql(feature.featureClass)}, ${quoteSql(feature.designator)}, ${quoteSql(coordinatesJson)}, ${quoteSql(payloadJson)});\n`;
+      });
+      sqlContent += 'COMMIT;\n';
       fs.writeFileSync(sqlPath, sqlContent, 'utf-8');
     }
 

@@ -1,6 +1,6 @@
 /**
  * DO-272 Spatial Analysis Engine
- * Implements Taxiway Graph Routing, 3D FAA Part 77 Obstacle Clearance, and PostGIS Spatial SQL
+ * Implements Taxiway Graph Routing, 3D FAA Part 77 Obstacle Clearance, and spatial query previews
  */
 
 import {
@@ -392,7 +392,7 @@ export interface SpatialSqlResult {
 }
 
 /**
- * Spatial SQL Execution Engine supporting both PostgreSQL (PostGIS) and SQLite (SpatiaLite)
+ * Local query preview over an aerodrome dataset loaded from the selected database.
  * Evaluates queries like:
  * - SELECT id, designator, length_m, pcn FROM do272_runways WHERE length_m > 3000
  * - SELECT id, structure_name, height_agl_m FROM do272_obstacles WHERE height_agl_m > 50
@@ -420,7 +420,12 @@ export function executeSpatialSql(
       rows.push([r.id, r.designator, len, wid, r.surface || 'Asphalt', r.pcnRating || 'PCN 100']);
       affectedFeatureIds.push(r.id);
     }
-  } else if (lowerSql.includes('do272_obstacles') || lowerSql.includes('vertical_structures') || lowerSql.includes('st_distance')) {
+  } else if (
+    lowerSql.includes('do272_obstacles')
+    || lowerSql.includes('vertical_structures')
+    || lowerSql.includes('verticalstructure')
+    || lowerSql.includes('st_distance')
+  ) {
     columns = ['structure_id', 'structure_name', 'height_agl_m', 'elevation_amsl_m', 'frangible', 'lighting'];
     const obstacles = dataset.features.filter((f): f is VerticalStructureFeature => f.featureClass === 'VerticalStructure');
     for (const o of obstacles) {

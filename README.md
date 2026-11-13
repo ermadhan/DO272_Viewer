@@ -18,13 +18,13 @@ A standards-compliant aeronautical GIS visualization, spatial engineering, and M
 
 ## Overview & Key Capabilities
 
-* **Interactive Aeronautical Map**: 2D Leaflet GIS canvas with sub-meter runway geometry, displaced thresholds, blast pads, taxiway centerlines, CAT III hold-short markings, stand lead-in lines, incursion hot spots, and NAVAIDs.
+* **Database-backed Interactive Aeronautical Map**: Loads airport metadata and DO-272 features from the Python API; SQLite is the default database.
 * **Autonomous In-App MCP AI Agent Client**: Conversational AI assistant with strategy/thought traces, JSON-RPC 2.0 tool execution inspection, and one-click "Sync & View on Map" actions.
 * **Python stdio MCP Server**: Standard Model Context Protocol server (`python_backend/mcp_server.py`) exposing DO-272 spatial analysis capabilities to Claude Desktop, Cursor, or external LLM workflows.
 * **Automated DO-272 Data Quality Requirement (DQR) Audits**: Geometry closure checks, duplicate vertex filtering, 5-part ICAO PCN syntax validation, hold-line setback verification, and stand connectivity scoring.
 * **Dijkstra Ground Taxiway Routing**: Graph pathfinding over connected `TaxiwayGuidanceLine` networks with turn-by-turn ATC taxi clearances and hot spot crossing alerts.
 * **3D FAA Part 77 Obstacle Clearance Evaluation**: Evaluates vertical structures against 1:50 approach and 1:7 transitional clearance surfaces with exact margin or penetration metrics.
-* **Dual Database Dialect Replication**: Exact schema replication and live spatial query runner for **PostgreSQL 16 + PostGIS 3.4** and **SQLite 3 + SpatiaLite**.
+* **Persistent Airport Data**: Airport metadata and complete feature records are stored in `do272_aerodromes` and `do272_features`. PostgreSQL is optional.
 * **Worldwide Open Data Ingestion**: Live Overpass API ingestion querying and classifying real-world aerodromes from OpenStreetMap worldwide (e.g. KJFK, KLAX, EHAM, LFPG, RJTT, WSSS) or custom FAA 18B GeoJSON.
 
 ---
@@ -46,32 +46,25 @@ A standards-compliant aeronautical GIS visualization, spatial engineering, and M
 ```
 +---------------------------------------------------------------------------------+
 |                       Vite React 19 Frontend (SPA)                              |
-|  - Leaflet 2D GIS Map (13 subsystem layers)                                     |
-|  - AI Agent Client Tab (MCPAgentChat: Strategy reasoning & Map Sync)             |
-|  - MCP Studio (Live Tool Tester, Spec Inspector, Config Generator)              |
-|  - Spatial Analysis HUD (Dijkstra Routing, Part 77 3D Obstacles, PostGIS SQL)   |
-|  - DO-272 43 Feature Class Explorer & Catalogue                                 |
+|  - Fetches airport datasets from FastAPI before rendering the map               |
+|  - Saves imported OpenStreetMap / FAA datasets through the API                  |
+|  - AI Agent Client, MCP Studio, Spatial Analysis HUD, Feature Explorer          |
 +---------------------------------------------------------------------------------+
-                                       |
-                   JSON-RPC 2.0 over stdio / WebSocket
+                                       | HTTP/JSON
                                        v
 +---------------------------------------------------------------------------------+
-|                 DO-272 Model Context Protocol (MCP) Server                     |
-|                   python_backend/mcp_server.py (stdio)                          |
-|                                                                                 |
-|  1. do272_validate_compliance       - DQR boundary, PCN & setback audit         |
-|  2. do272_find_taxi_route           - Dijkstra shortest ground path solver      |
-|  3. do272_obstacle_clearance_check  - 3D Part 77 / ICAO Annex 14 evaluation     |
-|  4. do272_query_features            - Subsystem spatial element inspection      |
-|  5. do272_spatial_sql               - Parameterized PostGIS / SQLite query      |
+|                    FastAPI Backend (python_backend/main.py)                     |
+|           Lists, loads, and upserts airport datasets in the selected DB         |
 +---------------------------------------------------------------------------------+
-                                       |
-                    PostGIS Spatial Geometry & Graph Math
+                                       | SQLAlchemy
                                        v
 +---------------------------------------------------------------------------------+
-|        Database Storage: PostgreSQL 16 + PostGIS 3.4  /  SQLite + SpatiaLite    |
+|    Database Storage: SQLite (default) / PostgreSQL (optional)                   |
+|    do272_aerodromes + do272_features (JSON coordinates and feature payloads)     |
 +---------------------------------------------------------------------------------+
 ```
+
+The standalone stdio MCP server is a separate process from this web data path.
 
 ---
 
@@ -127,7 +120,7 @@ You can batch-ingest aerodrome datasets from the command line using either **Nod
 # Ingest all Top 50 airports from the CSV file:
 npm run ingest -- --csv data/top50_airports.csv
 
-# Ingest top 10 airports with PostGIS/SQLite SQL scripts generated:
+# Ingest top 10 airports and generate SQL insert scripts:
 npm run ingest -- --csv data/top50_airports.csv --limit 10 --sql
 
 # Ingest from plain text file containing ICAO codes:
@@ -164,13 +157,13 @@ python python_backend/ingest_open_data.py --icao KATL,KDFW,OMDB
 | `--limit` | `<num>` | Maximum number of airports to process from list | Process all |
 | `--output` | `<dir>` | Target output directory for datasets | `data/ingested_airports` |
 | `--delay` | `<ms>` | Delay between queries in milliseconds | `500` ms |
-| `--sql` | *flag* | Export PostGIS / SQLite SQL insert scripts (`*.sql`) | Disabled |
+| `--sql` | *flag* | Export database insert scripts for the current schema (`*.sql`) | Disabled |
 | `--no-validate` | *flag* | Skip post-ingestion DO-272 compliance audit | Validate enabled |
 
 ### Output Artifacts
 Each run populates the output folder with:
 * `<ICAO>.json`: Full RTCA DO-272 compliant JSON dataset with all classified features.
-* `<ICAO>.sql` (when `--sql` is passed): Executable spatial SQL insert script for PostGIS / SQLite.
+* `<ICAO>.sql` (when `--sql` is passed): SQL insert script for the aerodrome and feature tables.
 * `manifest.json`: Catalog index summarizing feature counts, runways, taxiways, stands, and audit compliance scores.
 
 ---
@@ -184,7 +177,7 @@ Follow these steps to run the complete stack on a Windows 10/11 laptop.
 2. **Python 3.10+**: Download from [python.org](https://www.python.org/).  
    *(Make sure to check the box: **"Add python.exe to PATH"** during installation!)*
 3. **Git for Windows**: Download from [git-scm.com](https://git-scm.com/).
-4. *(Optional for local database)* **Docker Desktop for Windows** or native **PostgreSQL 16 + PostGIS 3.4**.
+4. *(Optional)* **Docker Desktop for Windows** or native PostgreSQL, if you want to use PostgreSQL instead of the default SQLite database.
 
 ---
 
@@ -197,7 +190,17 @@ cd do272-aerodrome-gis
 
 ---
 
-### Step 2: Set Up and Run the Frontend
+### Step 2: Set Up and Run the Python Backend
+The frontend reads airport data from this API. Starting the backend creates the SQLite schema and inserts any missing curated datasets from `python_backend/seed_data/airports.json`.
+
+```cmd
+cd python_backend
+start_backend.bat
+```
+
+By default the backend uses `python_backend/do272_aerodromes.db`. Set `SQLITE_URL` to override its location. PostgreSQL can be selected in the UI when its configured server is available.
+
+### Step 3: Set Up and Run the Frontend
 Install Node.js dependencies and start the Vite development server:
 ```cmd
 npm install
@@ -208,42 +211,20 @@ The application will be accessible at:
 
 ---
 
-### Step 3: Set Up and Run the Python Backend & MCP Server
+### Step 4: Run the Standalone MCP Server (Optional)
 Open a second Command Prompt or PowerShell window in the project folder:
 ```cmd
 cd python_backend
 ```
 
-#### Option A: Quick-Start via Batch File
-Double-click or run:
-```cmd
-start_backend.bat
-```
-This batch script will automatically:
-1. Verify Python is installed in PATH.
-2. Create a clean virtual environment (`venv`).
-3. Activate the virtual environment.
-4. Install all packages from `requirements.txt` (FastAPI, uvicorn, Shapely, GeoAlchemy2, MCP SDK, psycopg2).
-5. Start the backend service.
-
-#### Option B: Manual Setup via Command Prompt
-```cmd
-python -m venv venv
-call venv\Scripts\activate
-pip install -r requirements.txt
-python main.py
-```
-
-To run the MCP server in standalone stdio mode:
+The batch file from the previous step creates the virtual environment and installs the backend dependencies. Start the stdio MCP server with:
 ```cmd
 call venv\Scripts\activate
 python mcp_server.py
 ```
 
----
-
-### Step 4: (Optional) Run Local PostgreSQL + PostGIS via Docker
-To run a local PostGIS database on port 5432:
+### Step 5: (Optional) Run Local PostgreSQL via Docker
+To run a local PostgreSQL database on port 5432:
 ```cmd
 cd python_backend
 docker compose up -d
@@ -257,9 +238,16 @@ postgresql://postgres:postgrespassword@localhost:5432/do272_aerodromes
 
 ## Running the Automated Test Suites
 
-The project includes two independent end-to-end test suites.
+The project includes backend database/API and MCP client tests, plus a TypeScript in-app MCP test suite.
 
-### 1. Python stdio MCP Client Test Suite
+### 1. Database API Persistence Tests
+Run from the repository root after installing the backend requirements:
+```cmd
+python -m unittest python_backend.test_database_api
+```
+These tests verify that seeded airports are served from the database and that imported features persist across reads.
+
+### 2. Python stdio MCP Client Test Suite
 Tests tool discovery (`tools/list`), execution of all 5 tools (`tools/call`), and JSON-RPC 2.0 error handling (`-32601`):
 ```cmd
 python python_backend/test_mcp_client.py
@@ -283,7 +271,7 @@ Test Suite Summary: 7/7 Passed (100.0%)
 ALL DO-272 MCP CLIENT TESTS PASSED SUCCESSFULLY! 🚀
 ```
 
-### 2. TypeScript In-App MCP Client & Agent E2E Suite
+### 3. TypeScript In-App MCP Client & Agent E2E Suite
 Validates the in-app autonomous agent reasoning loop, tool parameter generation, and map sync formatting across all 4 hub aerodromes:
 ```cmd
 npx tsx tests/mcp-client-e2e.ts

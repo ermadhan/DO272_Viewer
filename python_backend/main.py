@@ -1,25 +1,42 @@
-"""
-DO-272 Standard Aeronautical GIS Backend API (FastAPI)
-Provides high-performance spatial analysis, routing, obstacle checks, and PostGIS integration.
-Compatible with Windows, Linux, and Cloud environments.
-"""
+"""DO-272 aerodrome API backed by SQLite or PostgreSQL."""
 
 import math
-from typing import List, Optional, Dict, Any
-from fastapi import FastAPI, HTTPException, Query
+from contextlib import asynccontextmanager
+from typing import Any, AsyncGenerator
+
+from fastapi import Depends, FastAPI, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel
+from sqlalchemy import func
+from sqlalchemy.exc import SQLAlchemyError
+from sqlalchemy.orm import Session, selectinload
 import uvicorn
 
-from database import init_db, SessionLocal, AerodromeModel, RunwayElementModel, VerticalStructureModel
+from database import (
+    AerodromeFeatureModel,
+    AerodromeModel,
+    activate_engine,
+    create_session,
+    get_active_engine_name,
+    initialize_database,
+    serialize_dataset,
+    upsert_dataset,
+)
+
+
+@asynccontextmanager
+async def lifespan(_: FastAPI) -> AsyncGenerator[None, None]:
+    initialize_database()
+    yield
+
 
 app = FastAPI(
     title="DO-272 Aerodrome Spatial GIS Engine",
-    description="RTCA DO-272 / EUROCAE ED-99 Spatial API with PostGIS analysis and taxiway routing",
+    description="Aerodrome data API backed by a persistent SQLite or PostgreSQL database.",
     version="1.0.0",
+    lifespan=lifespan,
 )
 
-# Enable CORS for local and web development
 app.add_middleware(
     CORSMiddleware,
     allow_origins=["*"],
@@ -29,9 +46,22 @@ app.add_middleware(
 )
 
 
-@app.on_event("startup")
-def on_startup():
-    init_db()
+class AerodromeDatasetPayload(BaseModel):
+    icao: str
+    iata: str = ""
+    name: str
+    city: str = ""
+    country: str = ""
+    center: tuple[float, float]
+    elevationMeters: float
+    magneticVariation: str = ""
+    transitionAltitudeFt: int = 18000
+    source: str
+    features: list[dict[str, Any]]
+
+
+class EngineToggleRequest(BaseModel):
+    engine: str
 
 
 class RouteRequest(BaseModel):
@@ -44,18 +74,27 @@ class ObstacleRequest(BaseModel):
     aerodrome_icao: str
 
 
-class SpatialSqlRequest(BaseModel):
-    query: str
+def get_db():
+    session = create_session()
+    try:
+        yield session
+    finally:
+        session.close()
 
 
 def haversine(c1, c2):
-    R = 6371000
+    earth_radius_m = 6371000
     lat1, lon1 = c1
     lat2, lon2 = c2
     dlat = math.radians(lat2 - lat1)
     dlon = math.radians(lon2 - lon1)
-    a = math.sin(dlat / 2) ** 2 + math.cos(math.radians(lat1)) * math.cos(math.radians(lat2)) * math.sin(dlon / 2) ** 2
-    return 2 * R * math.asin(math.sqrt(a))
+    a = (
+        math.sin(dlat / 2) ** 2
+        + math.cos(math.radians(lat1))
+        * math.cos(math.radians(lat2))
+        * math.sin(dlon / 2) ** 2
+    )
+    return 2 * earth_radius_m * math.asin(math.sqrt(a))
 
 
 @app.get("/")
@@ -64,26 +103,82 @@ def read_root():
         "status": "online",
         "standard": "RTCA DO-272 / EUROCAE ED-99",
         "mcp_enabled": True,
-        "database": "PostgreSQL / PostGIS",
+        "database": get_active_engine_name(),
     }
 
 
 @app.get("/api/v1/aerodromes")
-def list_aerodromes():
+def list_aerodromes(db: Session = Depends(get_db)):
+    rows = (
+        db.query(
+            AerodromeModel.icao,
+            AerodromeModel.iata,
+            AerodromeModel.name,
+            AerodromeModel.city,
+            AerodromeModel.country,
+            func.count(AerodromeFeatureModel.id).label("feature_count"),
+        )
+        .outerjoin(
+            AerodromeFeatureModel,
+            AerodromeFeatureModel.aerodrome_id == AerodromeModel.icao,
+        )
+        .group_by(AerodromeModel.icao)
+        .order_by(AerodromeModel.icao)
+        .all()
+    )
     return [
-        {"icao": "KSFO", "name": "San Francisco International", "country": "USA", "runways": 4},
-        {"icao": "EGLL", "name": "London Heathrow", "country": "UK", "runways": 2},
-        {"icao": "EDDF", "name": "Frankfurt Airport", "country": "Germany", "runways": 4},
-        {"icao": "OMDB", "name": "Dubai International", "country": "UAE", "runways": 2},
+        {
+            "icao": row.icao,
+            "iata": row.iata,
+            "name": row.name,
+            "city": row.city,
+            "country": row.country,
+            "featureCount": row.feature_count,
+        }
+        for row in rows
     ]
+
+
+@app.get("/api/v1/aerodromes/{icao}")
+def get_aerodrome(icao: str, db: Session = Depends(get_db)):
+    aerodrome = (
+        db.query(AerodromeModel)
+        .options(selectinload(AerodromeModel.feature_rows))
+        .filter(AerodromeModel.icao == icao.strip().upper())
+        .one_or_none()
+    )
+    if aerodrome is None:
+        raise HTTPException(status_code=404, detail=f"Aerodrome {icao.upper()} was not found")
+    return serialize_dataset(aerodrome)
+
+
+@app.put("/api/v1/aerodromes/{icao}")
+def save_aerodrome(
+    icao: str,
+    dataset: AerodromeDatasetPayload,
+    db: Session = Depends(get_db),
+):
+    normalized_icao = icao.strip().upper()
+    if dataset.icao.strip().upper() != normalized_icao:
+        raise HTTPException(
+            status_code=422,
+            detail="The ICAO code in the URL must match the dataset",
+        )
+
+    upsert_dataset(db, dataset.model_dump())
+    db.commit()
+    saved_aerodrome = (
+        db.query(AerodromeModel)
+        .options(selectinload(AerodromeModel.feature_rows))
+        .filter(AerodromeModel.icao == normalized_icao)
+        .one()
+    )
+    return serialize_dataset(saved_aerodrome)
 
 
 @app.post("/api/v1/spatial/route")
 def solve_taxi_route(req: RouteRequest):
-    """
-    Computes shortest taxi path along DO-272 TaxiwayGuidanceLine network
-    """
-    # Deterministic ground routing calculation
+    """Return a temporary sample route; map features are loaded from the database."""
     mock_waypoints = [
         [37.6142, -122.382],
         [37.6177, -122.381],
@@ -91,22 +186,24 @@ def solve_taxi_route(req: RouteRequest):
         [37.6197, -122.388],
         [37.6175, -122.3885],
     ]
-    dist = 0.0
-    for i in range(len(mock_waypoints) - 1):
-        dist += haversine(mock_waypoints[i], mock_waypoints[i + 1])
-
+    distance = sum(
+        haversine(mock_waypoints[i], mock_waypoints[i + 1])
+        for i in range(len(mock_waypoints) - 1)
+    )
+    origin = req.origin_key
+    destination = req.destination_key
     return {
         "aerodrome": req.aerodrome_icao,
-        "origin": req.origin_key,
-        "destination": req.destination_key,
-        "distance_meters": round(dist),
-        "estimated_minutes": round(dist / 7.7 / 60, 1),
+        "origin": origin,
+        "destination": destination,
+        "distance_meters": round(distance),
+        "estimated_minutes": round(distance / 7.7 / 60, 1),
         "route_steps": [
-            f"Depart {req.origin_key}",
+            f"Depart {origin}",
             "Follow Taxiway F to hold short 28R",
             "Cross Runway 28R with ATC clearance",
             "Join Taxiway Alpha eastbound",
-            f"Enter {req.destination_key}",
+            f"Enter {destination}",
         ],
         "hold_positions": ["HOLD RWY 28R @ F"],
         "waypoints": mock_waypoints,
@@ -115,15 +212,14 @@ def solve_taxi_route(req: RouteRequest):
 
 @app.post("/api/v1/spatial/obstacles")
 def evaluate_obstacles(req: ObstacleRequest):
-    """
-    Evaluates 3D obstacle clearance against FAA Part 77 imaginary surfaces
-    """
+    """Return sample obstacle results; map features are loaded from the database."""
+    icao = req.aerodrome_icao
     return {
-        "aerodrome": req.aerodrome_icao,
+        "aerodrome": icao,
         "obstacles_evaluated": 3,
         "evaluations": [
             {
-                "id": f"{req.aerodrome_icao}-ATCT",
+                "id": f"{icao}-ATCT",
                 "name": "Air Traffic Control Tower",
                 "height_agl": 67.4,
                 "elevation_amsl": 71.4,
@@ -133,7 +229,7 @@ def evaluate_obstacles(req: ObstacleRequest):
                 "penetration_meters": 22.4,
             },
             {
-                "id": f"{req.aerodrome_icao}-HANGAR",
+                "id": f"{icao}-HANGAR",
                 "name": "Maintenance Hangar",
                 "height_agl": 35.0,
                 "elevation_amsl": 39.0,
@@ -146,47 +242,31 @@ def evaluate_obstacles(req: ObstacleRequest):
     }
 
 
-class EngineToggleRequest(BaseModel):
-    engine: str  # "postgres" or "sqlite"
-
-
 @app.get("/api/v1/database/engine")
 def get_database_engine():
-    """
-    Returns active database engine and exact schema replication state
-    """
     return {
-        "active_engine": "postgres",
-        "supported_engines": ["postgres", "sqlite"],
-        "schema_replication": "exact",
-        "tables_replicated": [
-            "do272_aerodromes",
-            "do272_runway_elements",
-            "do272_taxiway_elements",
-            "do272_guidance_lines",
-            "do272_parking_stands",
-            "do272_vertical_structures",
-            "do272_hot_spots",
-        ],
-        "postgres_dialect": "PostGIS 3.4 GEOMETRY",
-        "sqlite_dialect": "SpatiaLite BLOB/GeoJSON",
+        "active_engine": get_active_engine_name(),
+        "supported_engines": ["sqlite", "postgres"],
+        "tables": ["do272_aerodromes", "do272_features"],
     }
 
 
 @app.post("/api/v1/database/engine")
 def set_database_engine(req: EngineToggleRequest):
-    """
-    Toggle between PostgreSQL (PostGIS) and SQLite (SpatiaLite)
-    """
-    chosen = req.engine.lower().strip()
-    if chosen not in ("postgres", "sqlite"):
-        raise HTTPException(status_code=400, detail="Engine must be 'postgres' or 'sqlite'")
+    try:
+        active_engine = activate_engine(req.engine)
+    except ValueError as error:
+        raise HTTPException(status_code=400, detail=str(error)) from error
+    except SQLAlchemyError as error:
+        raise HTTPException(
+            status_code=503,
+            detail=f"Could not connect to the {req.engine} database: {error}",
+        ) from error
 
     return {
         "status": "switched",
-        "previous_engine": "postgres" if chosen == "sqlite" else "sqlite",
-        "active_engine": chosen,
-        "schema_status": "replicated_identical",
+        "active_engine": active_engine,
+        "schema_status": "ready",
     }
 
 

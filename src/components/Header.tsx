@@ -1,11 +1,13 @@
 import React from 'react';
 import { Database, Download, Terminal, Plane, Compass, ShieldAlert, Cpu, BookOpen, Layers, Bot } from 'lucide-react';
 import { DatabaseEngine } from '../services/databaseSchema';
+import { AerodromeSummary } from '../services/aerodromeApi';
 
 interface HeaderProps {
   activeTab: 'map' | 'features' | 'routing' | 'obstacles' | 'sql' | 'mcp' | 'agent' | 'windows';
   setActiveTab: (tab: 'map' | 'features' | 'routing' | 'obstacles' | 'sql' | 'mcp' | 'agent' | 'windows') => void;
   selectedIcao: string;
+  aerodromes: AerodromeSummary[];
   onSelectIcao: (icao: string) => void;
   databaseEngine: DatabaseEngine;
   onToggleDatabaseEngine: (engine: DatabaseEngine) => void;
@@ -18,6 +20,7 @@ export const Header: React.FC<HeaderProps> = ({
   activeTab,
   setActiveTab,
   selectedIcao,
+  aerodromes,
   onSelectIcao,
   databaseEngine,
   onToggleDatabaseEngine,
@@ -42,7 +45,7 @@ export const Header: React.FC<HeaderProps> = ({
             <span>ED-99</span>
             <span>·</span>
             <span className={databaseEngine === 'postgres' ? 'text-emerald-400 font-bold' : 'text-sky-400 font-bold'}>
-              {databaseEngine === 'postgres' ? 'PostgreSQL (PostGIS)' : 'SQLite (SpatiaLite)'}
+              {databaseEngine === 'postgres' ? 'PostgreSQL' : 'SQLite'}
             </span>
           </div>
         </div>
@@ -56,7 +59,7 @@ export const Header: React.FC<HeaderProps> = ({
                 ? 'bg-emerald-600 text-white font-bold shadow-xs'
                 : 'text-slate-400 hover:text-slate-200'
             }`}
-            title="Switch to PostgreSQL 16 + PostGIS 3.4 Spatial Dialect"
+            title="Switch to the PostgreSQL database"
           >
             PostgreSQL
           </button>
@@ -67,7 +70,7 @@ export const Header: React.FC<HeaderProps> = ({
                 ? 'bg-sky-600 text-white font-bold shadow-xs'
                 : 'text-slate-400 hover:text-slate-200'
             }`}
-            title="Switch to SQLite 3 + SpatiaLite Dialect"
+            title="Switch to the SQLite database"
           >
             SQLite
           </button>
@@ -130,7 +133,7 @@ export const Header: React.FC<HeaderProps> = ({
           }`}
         >
           <Database className="w-3.5 h-3.5 text-emerald-400" />
-          PostGIS SQL
+          Spatial SQL
         </button>
         <button
           onClick={() => setActiveTab('mcp')}
@@ -179,12 +182,14 @@ export const Header: React.FC<HeaderProps> = ({
           <select
             value={selectedIcao}
             onChange={(e) => onSelectIcao(e.target.value)}
+            disabled={aerodromes.length === 0}
             className="bg-transparent text-white font-mono text-xs focus:outline-none cursor-pointer pr-1"
           >
-            <option value="KSFO" className="bg-slate-900 text-white">KSFO (San Francisco)</option>
-            <option value="EGLL" className="bg-slate-900 text-white">EGLL (London Heathrow)</option>
-            <option value="EDDF" className="bg-slate-900 text-white">EDDF (Frankfurt)</option>
-            <option value="OMDB" className="bg-slate-900 text-white">OMDB (Dubai)</option>
+            {aerodromes.map((aerodrome) => (
+              <option key={aerodrome.icao} value={aerodrome.icao} className="bg-slate-900 text-white">
+                {aerodrome.icao} ({aerodrome.name})
+              </option>
+            ))}
           </select>
         </div>
 

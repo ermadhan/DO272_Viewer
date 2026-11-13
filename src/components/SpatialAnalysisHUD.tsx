@@ -73,13 +73,13 @@ export const SpatialAnalysisHUD: React.FC<SpatialAnalysisHUDProps> = ({
 
   // SQL State
   const [sqlQuery, setSqlQuery] = useState<string>(
-    'SELECT runway_id, designator, length_m, pcn_rating FROM do272_runways WHERE length_m > 3000'
+    "SELECT id, designator, payload FROM do272_features WHERE feature_class = 'RunwayElement' AND length_m > 3000"
   );
   const [sqlResult, setSqlResult] = useState<SpatialSqlResult | null>(null);
 
   // Schema state
   const [copiedDdl, setCopiedDdl] = useState<boolean>(false);
-  const [selectedSchemaTable, setSelectedSchemaTable] = useState<string>('do272_runway_elements');
+  const [selectedSchemaTable, setSelectedSchemaTable] = useState<string>('do272_features');
 
   // Auto-sync origin and destination when switching between aerodromes
   useEffect(() => {
@@ -134,7 +134,7 @@ export const SpatialAnalysisHUD: React.FC<SpatialAnalysisHUDProps> = ({
       <div className="flex items-center justify-between pb-4 border-b border-slate-800 shrink-0">
         <div>
           <span className="text-[10px] font-mono text-emerald-400 uppercase tracking-widest block">
-            Spatial Analysis Engine · {databaseEngine === 'postgres' ? 'PostgreSQL (PostGIS)' : 'SQLite (SpatiaLite)'}
+            Spatial Analysis Engine · {databaseEngine === 'postgres' ? 'PostgreSQL' : 'SQLite'}
           </span>
           <h2 className="text-base font-bold text-white font-mono flex items-center gap-2">
             <span>{dataset.icao} Aeronautical Analytics</span>
@@ -377,14 +377,14 @@ export const SpatialAnalysisHUD: React.FC<SpatialAnalysisHUDProps> = ({
           </div>
         )}
 
-        {/* 3. POSTGIS / SQLITE SQL TERMINAL */}
+        {/* 3. Database-loaded spatial query preview */}
         {activeTab === 'sql' && (
           <div className="space-y-4">
             <div className="p-3 bg-slate-950 rounded-lg border border-slate-800 space-y-3 font-mono">
               <div className="flex items-center justify-between">
                 <div className="flex items-center gap-2">
                   <span className="text-[11px] text-slate-400 uppercase tracking-wider">
-                    Spatial SQL Engine:
+                    Query preview dialect:
                   </span>
                   <div className="flex items-center bg-slate-900 border border-slate-700 rounded p-0.5 text-[10px]">
                     <button
@@ -395,7 +395,7 @@ export const SpatialAnalysisHUD: React.FC<SpatialAnalysisHUDProps> = ({
                           : 'text-slate-400 hover:text-slate-200'
                       }`}
                     >
-                      PostgreSQL + PostGIS
+                      PostgreSQL
                     </button>
                     <button
                       onClick={() => onToggleDatabaseEngine('sqlite')}
@@ -405,7 +405,7 @@ export const SpatialAnalysisHUD: React.FC<SpatialAnalysisHUDProps> = ({
                           : 'text-slate-400 hover:text-slate-200'
                       }`}
                     >
-                      SQLite + SpatiaLite
+                      SQLite
                     </button>
                   </div>
                 </div>
@@ -414,7 +414,7 @@ export const SpatialAnalysisHUD: React.FC<SpatialAnalysisHUDProps> = ({
                   <button
                     onClick={() =>
                       setSqlQuery(
-                        'SELECT runway_id, designator, length_m, pcn_rating FROM do272_runways WHERE length_m > 3000'
+                        "SELECT id, designator, payload FROM do272_features WHERE feature_class = 'RunwayElement' AND length_m > 3000"
                       )
                     }
                     className="text-[10px] text-sky-400 hover:underline"
@@ -425,7 +425,7 @@ export const SpatialAnalysisHUD: React.FC<SpatialAnalysisHUDProps> = ({
                   <button
                     onClick={() =>
                       setSqlQuery(
-                        'SELECT structure_id, structure_name, height_agl_m FROM do272_obstacles WHERE height_agl_m > 50'
+                        "SELECT id, designator, payload FROM do272_features WHERE feature_class = 'VerticalStructure' AND height_agl_m > 50"
                       )
                     }
                     className="text-[10px] text-sky-400 hover:underline"
@@ -435,11 +435,7 @@ export const SpatialAnalysisHUD: React.FC<SpatialAnalysisHUDProps> = ({
                   <span className="text-slate-600">·</span>
                   <button
                     onClick={() =>
-                      setSqlQuery(
-                        databaseEngine === 'postgres'
-                          ? 'SELECT hotspot_id, designator, ST_Buffer(geom, 150) FROM do272_hotspots'
-                          : 'SELECT hotspot_id, designator, ST_Buffer(geom, 150) FROM do272_hot_spots'
-                      )
+                      setSqlQuery("SELECT id, designator, payload FROM do272_features WHERE feature_class = 'HotSpot'")
                     }
                     className="text-[10px] text-sky-400 hover:underline"
                   >
@@ -453,12 +449,16 @@ export const SpatialAnalysisHUD: React.FC<SpatialAnalysisHUDProps> = ({
                 onChange={(e) => setSqlQuery(e.target.value)}
                 rows={3}
                 className="w-full bg-slate-900 border border-slate-700 rounded-lg p-2.5 text-xs text-emerald-400 font-mono focus:outline-none focus:border-emerald-500"
-                placeholder="Enter spatial SQL..."
+                placeholder="Enter a SQL-like spatial query..."
               />
+
+              <p className="text-[10px] text-slate-500">
+                Query previews use this airport's feature dataset loaded from the selected database.
+              </p>
 
               <div className="flex items-center justify-between">
                 <span className="text-[10px] text-slate-500">
-                  Target Dialect: <strong className="text-slate-300">{databaseEngine.toUpperCase()}</strong>
+                  Loaded database: <strong className="text-slate-300">{databaseEngine.toUpperCase()}</strong>
                 </span>
 
                 <button
@@ -466,7 +466,7 @@ export const SpatialAnalysisHUD: React.FC<SpatialAnalysisHUDProps> = ({
                   className="flex items-center gap-2 px-4 py-2 bg-emerald-600 hover:bg-emerald-500 text-white font-semibold rounded-lg transition-colors text-xs shadow-md cursor-pointer"
                 >
                   <Play className="w-3.5 h-3.5 fill-current" />
-                  Execute Spatial Query ({databaseEngine === 'postgres' ? 'PostgreSQL' : 'SQLite'})
+                  Preview Query
                 </button>
               </div>
             </div>
@@ -526,7 +526,7 @@ export const SpatialAnalysisHUD: React.FC<SpatialAnalysisHUDProps> = ({
                         : 'text-slate-400 hover:text-slate-200'
                     }`}
                   >
-                    PostgreSQL 16 (PostGIS)
+                    PostgreSQL
                   </button>
                   <button
                     onClick={() => onToggleDatabaseEngine('sqlite')}
@@ -536,7 +536,7 @@ export const SpatialAnalysisHUD: React.FC<SpatialAnalysisHUDProps> = ({
                         : 'text-slate-400 hover:text-slate-200'
                     }`}
                   >
-                    SQLite 3 (SpatiaLite)
+                    SQLite
                   </button>
                 </div>
               </div>
@@ -595,7 +595,7 @@ export const SpatialAnalysisHUD: React.FC<SpatialAnalysisHUDProps> = ({
               {/* DDL Code Viewer */}
               <div className="space-y-1.5">
                 <span className="text-[10px] text-slate-500 uppercase">
-                  {databaseEngine === 'postgres' ? 'PostgreSQL PostGIS DDL' : 'SQLite SpatiaLite DDL'}:
+                  {databaseEngine === 'postgres' ? 'PostgreSQL DDL' : 'SQLite DDL'}:
                 </span>
                 <pre className="bg-slate-900 p-3 rounded-lg border border-slate-800 text-emerald-400 text-[11px] overflow-x-auto leading-relaxed">
                   {databaseEngine === 'postgres' ? currentTableSchema.postgresDDL : currentTableSchema.sqliteDDL}

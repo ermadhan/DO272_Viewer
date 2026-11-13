@@ -48,7 +48,7 @@ export const MCPAgentChat: React.FC<MCPAgentChatProps> = ({
       role: 'assistant',
       content: `DO-272 Model Context Protocol (MCP) AI Client initialized for **${dataset.name} (${dataset.icao})**.
 
-I am connected to the local DO-272 MCP Tool Server exposing 5 standards-compliant spatial analysis capabilities. You can command me to audit aerodrome geometries, calculate optimal ground taxiway paths, evaluate 3D FAA Part 77 obstacle clearance surfaces, or execute spatial PostGIS queries.`,
+I am connected to the local DO-272 MCP Tool Server exposing 5 spatial analysis capabilities. You can command me to audit aerodrome geometries, calculate taxiway paths, evaluate FAA Part 77 obstacle clearance, or preview a spatial query against this airport's database-loaded features.`,
       timestamp: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
       thought: `Initialized stdio connection with DO-272 MCP server registry. 5 spatial analysis tools loaded for aerodrome ${dataset.icao}.`,
     },
@@ -130,7 +130,7 @@ I am connected to the local DO-272 MCP Tool Server exposing 5 standards-complian
       prompt: `Evaluate vertical structures at ${dataset.icao} for Part 77 approach surface penetrations.`,
     },
     {
-      label: 'Spatial PostGIS SQL',
+      label: 'Spatial Query Preview',
       prompt: `SELECT designator, lengthMeters, pcnRating FROM runways WHERE lengthMeters > 2500`,
     },
   ];

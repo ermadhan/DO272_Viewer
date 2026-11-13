@@ -24,7 +24,7 @@ call venv\Scripts\activate
 echo Installing requirements...
 pip install -r requirements.txt
 
-:: Set default PostgreSQL connection or fallback to SQLite
+:: Optional PostgreSQL connection used when selected in the UI
 set POSTGRES_URL=postgresql://postgres:postgrespassword@localhost:5432/do272_aerodromes
 
 echo Starting FastAPI server at http://127.0.0.1:8000

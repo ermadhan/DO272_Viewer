@@ -90,7 +90,7 @@ volumes:
                 Windows PC Deployment Guide
               </h2>
               <p className="text-xs text-slate-400">
-                Run FastAPI, PostgreSQL/PostGIS, and the Model Context Protocol (MCP) server locally.
+                Run the FastAPI backend with SQLite by default, plus the optional PostgreSQL and MCP services.
               </p>
             </div>
           </div>
@@ -119,10 +119,10 @@ volumes:
             <div className="p-3.5 bg-slate-950 rounded-xl border border-slate-800 space-y-2">
               <div className="flex items-center gap-2 text-emerald-400 font-bold">
                 <ShieldCheck className="w-4 h-4" />
-                <span>2. Start PostGIS</span>
+                <span>2. Database (SQLite default)</span>
               </div>
               <p className="text-slate-400 leading-relaxed text-[11px]">
-                Run <code className="text-emerald-400">docker compose up -d</code> in <code className="text-slate-300">/python_backend</code> or use local PostgreSQL.
+                SQLite is created and seeded when the backend starts. PostgreSQL is optional; use Docker only if you want to switch to it.
               </p>
             </div>
 

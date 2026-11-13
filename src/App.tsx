@@ -3,13 +3,13 @@
  * RTCA DO-272 / EUROCAE ED-99 Standards Compliance Engine
  */
 
-import React, { useState, useMemo } from 'react';
+import React, { useEffect, useState, useMemo } from 'react';
 import {
   AerodromeDataset,
   AnyDO272Feature,
   TaxiRouteResult,
 } from './types/do272';
-import { PRELOADED_AERODROMES, fetchOsmAerodrome } from './data/aerodromes';
+import { fetchOsmAerodrome } from './data/aerodromes';
 import { Header } from './components/Header';
 import { AerodromeMap } from './components/AerodromeMap';
 import { LayerControls, LayerVisibilityState } from './components/LayerControls';
@@ -23,6 +23,14 @@ import { DO272FeatureExplorer } from './components/DO272FeatureExplorer';
 import { MCPAgentChat } from './components/MCPAgentChat';
 import { AgentMapSyncPayload } from './services/mcpAgentService';
 import { DatabaseEngine } from './services/databaseSchema';
+import {
+  AerodromeSummary,
+  getAerodromeDataset,
+  getAerodromes,
+  getDatabaseEngine,
+  saveAerodromeDataset,
+  setDatabaseEngine as switchDatabaseEngine,
+} from './services/aerodromeApi';
 import { Loader2, RefreshCw } from 'lucide-react';
 
 export default function App() {
@@ -31,12 +39,64 @@ export default function App() {
   const [databaseEngine, setDatabaseEngine] = useState<DatabaseEngine>('sqlite');
   const [isFetchingLiveOsm, setIsFetchingLiveOsm] = useState<boolean>(false);
   const [selectedIcao, setSelectedIcao] = useState<string>('KSFO');
-  const [customDatasets, setCustomDatasets] = useState<Record<string, AerodromeDataset>>({});
+  const [aerodromes, setAerodromes] = useState<AerodromeSummary[]>([]);
+  const [currentDataset, setCurrentDataset] = useState<AerodromeDataset | null>(null);
+  const [apiError, setApiError] = useState<string | null>(null);
+  const [isLoadingDataset, setIsLoadingDataset] = useState(true);
+  const [refreshKey, setRefreshKey] = useState(0);
 
-  // Active Aerodrome Dataset
-  const currentDataset: AerodromeDataset = useMemo(() => {
-    return customDatasets[selectedIcao] || PRELOADED_AERODROMES[selectedIcao] || PRELOADED_AERODROMES.KSFO;
-  }, [selectedIcao, customDatasets]);
+  useEffect(() => {
+    let cancelled = false;
+    setIsLoadingDataset(true);
+    Promise.all([getAerodromes(), getDatabaseEngine()])
+      .then(([loadedAerodromes, activeEngine]) => {
+        if (cancelled) return;
+        setAerodromes(loadedAerodromes);
+        setDatabaseEngine(activeEngine);
+        setSelectedIcao((currentIcao) =>
+          loadedAerodromes.some((aerodrome) => aerodrome.icao === currentIcao)
+            ? currentIcao
+            : loadedAerodromes[0]?.icao || ''
+        );
+      })
+      .catch((error: unknown) => {
+        if (cancelled) return;
+        setApiError(error instanceof Error ? error.message : 'Failed to load aerodromes from the database.');
+        setIsLoadingDataset(false);
+      });
+
+    return () => {
+      cancelled = true;
+    };
+  }, [refreshKey]);
+
+  useEffect(() => {
+    if (!selectedIcao) {
+      setCurrentDataset(null);
+      setIsLoadingDataset(false);
+      return;
+    }
+
+    let cancelled = false;
+    setCurrentDataset(null);
+    setIsLoadingDataset(true);
+    setApiError(null);
+    getAerodromeDataset(selectedIcao)
+      .then((dataset) => {
+        if (cancelled) return;
+        setCurrentDataset(dataset);
+        setIsLoadingDataset(false);
+      })
+      .catch((error: unknown) => {
+        if (cancelled) return;
+        setApiError(error instanceof Error ? error.message : `Failed to load ${selectedIcao} from the database.`);
+        setIsLoadingDataset(false);
+      });
+
+    return () => {
+      cancelled = true;
+    };
+  }, [selectedIcao, databaseEngine, refreshKey]);
 
   // Layer Visibility State
   const [layers, setLayers] = useState<LayerVisibilityState>({
@@ -68,6 +128,7 @@ export default function App() {
   // Dynamic Feature Counts per Subsystem
   const featureCounts = useMemo(() => {
     const counts: Record<string, number> = {};
+    if (!currentDataset) return counts;
     for (const f of currentDataset.features) {
       if (f.featureClass === 'RunwayElement') counts.runways = (counts.runways || 0) + 1;
       else if (f.featureClass === 'RunwayThreshold' || f.featureClass === 'RunwayDisplacedThreshold')
@@ -94,9 +155,25 @@ export default function App() {
     return counts;
   }, [currentDataset]);
 
-  const handleDatasetLoaded = (newDataset: AerodromeDataset) => {
-    setCustomDatasets((prev) => ({ ...prev, [newDataset.icao]: newDataset }));
-    setSelectedIcao(newDataset.icao);
+  const handleDatasetLoaded = async (newDataset: AerodromeDataset) => {
+    const savedDataset = await saveAerodromeDataset(newDataset);
+    setAerodromes((previous) => {
+      const summary: AerodromeSummary = {
+        icao: savedDataset.icao,
+        iata: savedDataset.iata,
+        name: savedDataset.name,
+        city: savedDataset.city,
+        country: savedDataset.country,
+        featureCount: savedDataset.features.length,
+      };
+      return [
+        ...previous.filter((aerodrome) => aerodrome.icao !== savedDataset.icao),
+        summary,
+      ].sort((a, b) => a.icao.localeCompare(b.icao));
+    });
+    setCurrentDataset(savedDataset);
+    setSelectedIcao(savedDataset.icao);
+    setApiError(null);
     setActiveRoute(null);
     setSelectedFeature(null);
     setHighlightedFeatureIds([]);
@@ -106,12 +183,42 @@ export default function App() {
     setIsFetchingLiveOsm(true);
     try {
       const liveDataset = await fetchOsmAerodrome(selectedIcao);
-      handleDatasetLoaded(liveDataset);
-    } catch (e) {
-      console.error('Failed to sync live OSM data', e);
+      await handleDatasetLoaded(liveDataset);
+    } catch (error: unknown) {
+      setApiError(error instanceof Error ? error.message : 'Failed to save live OSM data to the database.');
     } finally {
       setIsFetchingLiveOsm(false);
     }
+  };
+
+  const handleSelectIcao = (icao: string) => {
+    setSelectedIcao(icao);
+    setActiveRoute(null);
+    setSelectedFeature(null);
+    setHighlightedFeatureIds([]);
+  };
+
+  const handleToggleDatabaseEngine = async (engine: DatabaseEngine) => {
+    if (engine === databaseEngine) return;
+    setApiError(null);
+    try {
+      const activeEngine = await switchDatabaseEngine(engine);
+      setDatabaseEngine(activeEngine);
+      const loadedAerodromes = await getAerodromes();
+      setAerodromes(loadedAerodromes);
+      setSelectedIcao((currentIcao) =>
+        loadedAerodromes.some((aerodrome) => aerodrome.icao === currentIcao)
+          ? currentIcao
+          : loadedAerodromes[0]?.icao || ''
+      );
+    } catch (error: unknown) {
+      setApiError(error instanceof Error ? error.message : `Failed to switch to ${engine}.`);
+    }
+  };
+
+  const handleRetryDatabaseLoad = () => {
+    setApiError(null);
+    setRefreshKey((key) => key + 1);
   };
 
   const handleApplyAgentGeometry = (payload: AgentMapSyncPayload) => {
@@ -137,146 +244,165 @@ export default function App() {
         activeTab={activeTab}
         setActiveTab={setActiveTab}
         selectedIcao={selectedIcao}
-        onSelectIcao={(icao) => {
-          setSelectedIcao(icao);
-          setActiveRoute(null);
-          setSelectedFeature(null);
-          setHighlightedFeatureIds([]);
-        }}
+        aerodromes={aerodromes}
+        onSelectIcao={handleSelectIcao}
         databaseEngine={databaseEngine}
-        onToggleDatabaseEngine={setDatabaseEngine}
+        onToggleDatabaseEngine={handleToggleDatabaseEngine}
         onOpenIngest={() => setIsIngestOpen(true)}
         onOpenWindowsGuide={() => setIsWindowsGuideOpen(true)}
         onOpenCatalogue={() => setIsCatalogueOpen(true)}
       />
 
-      {/* Aerodrome Overview Kicker Banner */}
-      <div className="bg-slate-900/90 border-b border-slate-800/80 px-6 py-2 flex items-center justify-between text-xs font-mono text-slate-400 shrink-0">
-        <div className="flex items-center gap-3">
-          <div className="flex items-center gap-1.5 text-slate-200">
-            <span className="text-white font-bold">{currentDataset.name}</span>
-            <span className="text-sky-400">({currentDataset.icao} / {currentDataset.iata})</span>
-          </div>
-          <span>·</span>
-          <span>{currentDataset.city}, {currentDataset.country}</span>
-          <span>·</span>
-          <span className="text-slate-300">Elev: {currentDataset.elevationMeters}m AMSL</span>
-          <span>·</span>
-          <span>Mag Var: {currentDataset.magneticVariation}</span>
+      {currentDataset && apiError && (
+        <div className="px-6 py-2 bg-rose-950/70 border-b border-rose-900 text-rose-200 text-xs">
+          Database request failed: {apiError}
         </div>
+      )}
 
-        <div className="flex items-center gap-3">
-          <button
-            onClick={handleSyncLiveOsm}
-            disabled={isFetchingLiveOsm}
-            className="flex items-center gap-1.5 px-2.5 py-1 bg-slate-800 hover:bg-slate-700 text-sky-300 hover:text-white rounded border border-slate-700 text-[11px] transition-colors cursor-pointer"
-            title="Fetch real-time high-resolution OpenStreetMap vector geometry"
-          >
-            {isFetchingLiveOsm ? (
-              <>
-                <Loader2 className="w-3 h-3 animate-spin text-sky-400" />
-                <span>Fetching Live OSM...</span>
-              </>
-            ) : (
-              <>
-                <RefreshCw className="w-3 h-3 text-sky-400" />
-                <span>Fetch Live OSM Vectors</span>
-              </>
-            )}
-          </button>
-          <span>·</span>
-          <span className="text-[11px] text-slate-500">Source:</span>
-          <span className="text-emerald-400 text-[11px]">{currentDataset.source}</span>
-          <span>·</span>
-          <span className="text-slate-300 tabular-nums">
-            {currentDataset.features.length} DO-272 Entities
-          </span>
-        </div>
-      </div>
-
-      {/* Main Viewport Workspace */}
-      <div className="relative flex-1 w-full h-full overflow-hidden flex">
-        {activeTab === 'features' ? (
-          <DO272FeatureExplorer
-            dataset={currentDataset}
-            databaseEngine={databaseEngine}
-            selectedFeature={selectedFeature}
-            onSelectFeature={(feat) => setSelectedFeature(feat)}
-            onNavigateToMap={(feat) => {
-              if (feat) setSelectedFeature(feat);
-              setActiveTab('map');
-            }}
-          />
-        ) : (
-          <>
-            {/* Primary Leaflet Map Container */}
-            <div className="relative flex-1 h-full w-full">
-              <AerodromeMap
-                dataset={currentDataset}
-                layers={layers}
-                activeRoute={activeRoute}
-                selectedFeature={selectedFeature}
-                onSelectFeature={(feat) => setSelectedFeature(feat)}
-                highlightedFeatureIds={highlightedFeatureIds}
-              />
-
-              {/* Floating Left: Subsystem Layer Controls (Only in map or routing view) */}
-              {(activeTab === 'map' || activeTab === 'routing') && (
-                <div className="absolute top-16 left-4 z-20">
-                  <LayerControls
-                    layers={layers}
-                    setLayers={setLayers}
-                    featureCounts={featureCounts}
-                    onOpenExplorer={() => setActiveTab('features')}
-                  />
-                </div>
-              )}
-
-              {/* Floating Right: Feature Inspector */}
-              {selectedFeature && (
-                <div className="absolute top-4 right-4 z-20">
-                  <FeatureInspector
-                    feature={selectedFeature}
-                    onClose={() => setSelectedFeature(null)}
-                  />
-                </div>
-              )}
+      {currentDataset ? (
+        <>
+          <div className="bg-slate-900/90 border-b border-slate-800/80 px-6 py-2 flex items-center justify-between text-xs font-mono text-slate-400 shrink-0">
+            <div className="flex items-center gap-3">
+              <div className="flex items-center gap-1.5 text-slate-200">
+                <span className="text-white font-bold">{currentDataset.name}</span>
+                <span className="text-sky-400">({currentDataset.icao} / {currentDataset.iata})</span>
+              </div>
+              <span>·</span>
+              <span>{currentDataset.city}, {currentDataset.country}</span>
+              <span>·</span>
+              <span className="text-slate-300">Elev: {currentDataset.elevationMeters}m AMSL</span>
+              <span>·</span>
+              <span>Mag Var: {currentDataset.magneticVariation}</span>
             </div>
 
-            {/* Spatial Analysis & PostGIS Engine HUD Drawer */}
-            {(activeTab === 'routing' || activeTab === 'obstacles' || activeTab === 'sql') && (
-              <div className="w-[520px] h-full z-30 p-3 bg-slate-950/90 backdrop-blur-md border-l border-slate-800 shadow-2xl flex flex-col">
-                <SpatialAnalysisHUD
-                  dataset={currentDataset}
-                  activeRoute={activeRoute}
-                  setActiveRoute={setActiveRoute}
-                  onHighlightFeatures={(ids) => setHighlightedFeatureIds(ids)}
-                  databaseEngine={databaseEngine}
-                  onToggleDatabaseEngine={setDatabaseEngine}
-                />
-              </div>
-            )}
+            <div className="flex items-center gap-3">
+              <button
+                onClick={handleSyncLiveOsm}
+                disabled={isFetchingLiveOsm}
+                className="flex items-center gap-1.5 px-2.5 py-1 bg-slate-800 hover:bg-slate-700 text-sky-300 hover:text-white rounded border border-slate-700 text-[11px] transition-colors cursor-pointer"
+                title="Fetch real-time high-resolution OpenStreetMap vector geometry and save it to the database"
+              >
+                {isFetchingLiveOsm ? (
+                  <>
+                    <Loader2 className="w-3 h-3 animate-spin text-sky-400" />
+                    <span>Fetching Live OSM...</span>
+                  </>
+                ) : (
+                  <>
+                    <RefreshCw className="w-3 h-3 text-sky-400" />
+                    <span>Fetch Live OSM Vectors</span>
+                  </>
+                )}
+              </button>
+              <span>·</span>
+              <span className="text-[11px] text-slate-500">Source:</span>
+              <span className="text-emerald-400 text-[11px]">{currentDataset.source}</span>
+              <span>·</span>
+              <span className="text-slate-300 tabular-nums">
+                {currentDataset.features.length} DO-272 Entities
+              </span>
+            </div>
+          </div>
 
-            {/* Model Context Protocol (MCP) Studio Drawer */}
-            {activeTab === 'mcp' && (
-              <div className="w-[640px] h-full z-30 p-3 bg-slate-950/90 backdrop-blur-md border-l border-slate-800 shadow-2xl flex flex-col">
-                <MCPStudio dataset={currentDataset} onSwitchToAgent={() => setActiveTab('agent')} />
-              </div>
-            )}
+          <div className="relative flex-1 w-full h-full overflow-hidden flex">
+            {activeTab === 'features' ? (
+              <DO272FeatureExplorer
+                dataset={currentDataset}
+                databaseEngine={databaseEngine}
+                selectedFeature={selectedFeature}
+                onSelectFeature={(feat) => setSelectedFeature(feat)}
+                onNavigateToMap={(feat) => {
+                  if (feat) setSelectedFeature(feat);
+                  setActiveTab('map');
+                }}
+              />
+            ) : (
+              <>
+                <div className="relative flex-1 h-full w-full">
+                  <AerodromeMap
+                    dataset={currentDataset}
+                    layers={layers}
+                    activeRoute={activeRoute}
+                    selectedFeature={selectedFeature}
+                    onSelectFeature={(feat) => setSelectedFeature(feat)}
+                    highlightedFeatureIds={highlightedFeatureIds}
+                  />
 
-            {/* Model Context Protocol (MCP) AI Agent Client Drawer */}
-            {activeTab === 'agent' && (
-              <div className="w-[660px] h-full z-30 p-3 bg-slate-950/95 backdrop-blur-md border-l border-slate-800 shadow-2xl flex flex-col">
-                <MCPAgentChat
-                  dataset={currentDataset}
-                  onApplyMapGeometry={handleApplyAgentGeometry}
-                  onNavigateToMap={() => {}}
-                />
-              </div>
+                  {(activeTab === 'map' || activeTab === 'routing') && (
+                    <div className="absolute top-16 left-4 z-20">
+                      <LayerControls
+                        layers={layers}
+                        setLayers={setLayers}
+                        featureCounts={featureCounts}
+                        onOpenExplorer={() => setActiveTab('features')}
+                      />
+                    </div>
+                  )}
+
+                  {selectedFeature && (
+                    <div className="absolute top-4 right-4 z-20">
+                      <FeatureInspector
+                        feature={selectedFeature}
+                        onClose={() => setSelectedFeature(null)}
+                      />
+                    </div>
+                  )}
+                </div>
+
+                {(activeTab === 'routing' || activeTab === 'obstacles' || activeTab === 'sql') && (
+                  <div className="w-[520px] h-full z-30 p-3 bg-slate-950/90 backdrop-blur-md border-l border-slate-800 shadow-2xl flex flex-col">
+                    <SpatialAnalysisHUD
+                      dataset={currentDataset}
+                      activeRoute={activeRoute}
+                      setActiveRoute={setActiveRoute}
+                      onHighlightFeatures={(ids) => setHighlightedFeatureIds(ids)}
+                      databaseEngine={databaseEngine}
+                      onToggleDatabaseEngine={handleToggleDatabaseEngine}
+                    />
+                  </div>
+                )}
+
+                {activeTab === 'mcp' && (
+                  <div className="w-[640px] h-full z-30 p-3 bg-slate-950/90 backdrop-blur-md border-l border-slate-800 shadow-2xl flex flex-col">
+                    <MCPStudio dataset={currentDataset} onSwitchToAgent={() => setActiveTab('agent')} />
+                  </div>
+                )}
+
+                {activeTab === 'agent' && (
+                  <div className="w-[660px] h-full z-30 p-3 bg-slate-950/95 backdrop-blur-md border-l border-slate-800 shadow-2xl flex flex-col">
+                    <MCPAgentChat
+                      dataset={currentDataset}
+                      onApplyMapGeometry={handleApplyAgentGeometry}
+                      onNavigateToMap={() => {}}
+                    />
+                  </div>
+                )}
+              </>
             )}
-          </>
-        )}
-      </div>
+          </div>
+        </>
+      ) : (
+        <main className="flex flex-1 flex-col items-center justify-center gap-4 px-6 text-center">
+          {apiError ? (
+            <>
+              <h2 className="text-lg font-semibold text-rose-300">Unable to load airport data</h2>
+              <p className="max-w-xl text-sm text-slate-400">{apiError}</p>
+              <button
+                onClick={handleRetryDatabaseLoad}
+                className="rounded-lg bg-sky-600 px-4 py-2 text-sm font-semibold text-white hover:bg-sky-500"
+              >
+                Retry database connection
+              </button>
+            </>
+          ) : aerodromes.length === 0 ? (
+            <p className="text-sm text-slate-400">
+              {isLoadingDataset ? 'Connecting to the database...' : 'No airport records are available in the database.'}
+            </p>
+          ) : (
+            <p className="text-sm text-slate-400">Loading {selectedIcao} from the database...</p>
+          )}
+        </main>
+      )}
 
       {/* Modals */}
       <WindowsSetupModal

@@ -96,7 +96,7 @@ export const REGISTERED_MCP_TOOLS: MCPToolDefinition[] = [
   {
     name: 'do272_spatial_sql',
     description:
-      'Execute spatial PostGIS / SQLite SQL query against aerodrome tables with spatial filters (ST_Length, ST_Distance, ST_Intersects).',
+      'Preview a SQL-like spatial query against the currently loaded aerodrome feature data fetched from the configured database.',
     inputSchema: {
       type: 'object',
       properties: {

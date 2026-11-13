@@ -6,7 +6,7 @@ import { fetchOsmAerodrome } from '../data/aerodromes';
 interface DataIngestModalProps {
   isOpen: boolean;
   onClose: () => void;
-  onDatasetLoaded: (dataset: AerodromeDataset) => void;
+  onDatasetLoaded: (dataset: AerodromeDataset) => Promise<void>;
 }
 
 export const DataIngestModal: React.FC<DataIngestModalProps> = ({
@@ -33,13 +33,11 @@ export const DataIngestModal: React.FC<DataIngestModalProps> = ({
 
     try {
       const dataset = await fetchOsmAerodrome(searchIcao);
+      await onDatasetLoaded(dataset);
       setStatusMessage(
-        `Successfully classified ${dataset.features.length} DO-272 features for ${dataset.name}!`
+        `Saved ${dataset.features.length} DO-272 features for ${dataset.name} to the database.`
       );
-      setTimeout(() => {
-        onDatasetLoaded(dataset);
-        onClose();
-      }, 900);
+      onClose();
     } catch (err: unknown) {
       setIsError(true);
       const msg = err instanceof Error ? err.message : 'Unknown error during open data ingestion';
@@ -49,11 +47,12 @@ export const DataIngestModal: React.FC<DataIngestModalProps> = ({
     }
   };
 
-  const handleImportFaaJson = () => {
+  const handleImportFaaJson = async () => {
+    let newDataset: AerodromeDataset;
     try {
       const parsed = JSON.parse(faaJsonInput);
       const features = parsed.features || [];
-      const newDataset: AerodromeDataset = {
+      newDataset = {
         icao: 'FAA-IMP',
         iata: 'IMP',
         name: parsed.name || 'FAA Airport GIS Imported',
@@ -83,11 +82,23 @@ export const DataIngestModal: React.FC<DataIngestModalProps> = ({
         })),
       };
 
-      onDatasetLoaded(newDataset);
-      onClose();
     } catch {
       setIsError(true);
       setStatusMessage('Invalid JSON format. Please ensure standard FAA GeoJSON.');
+      return;
+    }
+
+    setIsLoading(true);
+    try {
+      await onDatasetLoaded(newDataset);
+      setStatusMessage(`Saved ${newDataset.features.length} imported features to the database.`);
+      onClose();
+    } catch (err: unknown) {
+      setIsError(true);
+      const msg = err instanceof Error ? err.message : 'Unknown error saving the imported dataset';
+      setStatusMessage(`Database save failed: ${msg}`);
+    } finally {
+      setIsLoading(false);
     }
   };
 

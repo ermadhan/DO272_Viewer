@@ -309,6 +309,10 @@ export function calculateTaxiRoute(
  * 3D Obstacle Clearance Evaluation (FAA Part 77 / ICAO Annex 14)
  */
 export function evaluateObstacleClearances(dataset: AerodromeDataset): ObstacleCheckResult[] {
+  if (dataset.elevationMeters === null) {
+    throw new Error('Aerodrome elevation is unknown; obstacle clearance cannot be evaluated.');
+  }
+  const elevationMeters = dataset.elevationMeters;
   const obstacles = dataset.features.filter(
     (f): f is VerticalStructureFeature => f.featureClass === 'VerticalStructure'
   );
@@ -339,25 +343,25 @@ export function evaluateObstacleClearances(dataset: AerodromeDataset): ObstacleC
 
     // Determine applicable imaginary surface
     let surface: 'Approach (1:50)' | 'Transitional (1:7)' | 'Inner Horizontal (45m)' | 'Conical (1:20)';
-    let allowedMaxElevationAmsl = dataset.elevationMeters + 45.0; // Default inner horizontal
+    let allowedMaxElevationAmsl = elevationMeters + 45.0; // Default inner horizontal
 
     if (minDistance < 300) {
       // Transitional surface: rises 1:7 from safety strip edge (assume 75m half-width)
       surface = 'Transitional (1:7)';
       const stripEdgeDist = Math.max(0, minDistance - 75);
-      allowedMaxElevationAmsl = dataset.elevationMeters + stripEdgeDist * (1 / 7);
+      allowedMaxElevationAmsl = elevationMeters + stripEdgeDist * (1 / 7);
     } else if (minDistance < 1500) {
       surface = 'Approach (1:50)';
-      allowedMaxElevationAmsl = dataset.elevationMeters + (minDistance * 0.02);
+      allowedMaxElevationAmsl = elevationMeters + (minDistance * 0.02);
     } else if (minDistance < 4000) {
       surface = 'Inner Horizontal (45m)';
-      allowedMaxElevationAmsl = dataset.elevationMeters + 45.0;
+      allowedMaxElevationAmsl = elevationMeters + 45.0;
     } else {
       surface = 'Conical (1:20)';
-      allowedMaxElevationAmsl = dataset.elevationMeters + 45.0 + ((minDistance - 4000) * 0.05);
+      allowedMaxElevationAmsl = elevationMeters + 45.0 + ((minDistance - 4000) * 0.05);
     }
 
-    const obsElev = obs.elevationAmslMeters || (obs.heightAglMeters ? obs.heightAglMeters + dataset.elevationMeters : dataset.elevationMeters);
+    const obsElev = obs.elevationAmslMeters || (obs.heightAglMeters ? obs.heightAglMeters + elevationMeters : elevationMeters);
     const obsHeight = obs.heightAglMeters || 30;
 
     const isPenetrating = obsElev > allowedMaxElevationAmsl;
@@ -430,7 +434,7 @@ export function executeSpatialSql(
     const obstacles = dataset.features.filter((f): f is VerticalStructureFeature => f.featureClass === 'VerticalStructure');
     for (const o of obstacles) {
       const hAgl = o.heightAglMeters || 0;
-      const elev = o.elevationAmslMeters || (hAgl + dataset.elevationMeters);
+      const elev = o.elevationAmslMeters ?? (dataset.elevationMeters === null ? 'Unknown' : hAgl + dataset.elevationMeters);
       if (lowerSql.includes('> 50') && hAgl <= 50) continue;
       rows.push([o.id, o.designator, hAgl, elev, o.frangible ? 'YES' : 'NO', o.lightingType || 'Unlit']);
       affectedFeatureIds.push(o.id);

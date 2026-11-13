@@ -24,7 +24,7 @@ A standards-compliant aeronautical GIS visualization, spatial engineering, and M
 * **Automated DO-272 Data Quality Requirement (DQR) Audits**: Geometry closure checks, duplicate vertex filtering, 5-part ICAO PCN syntax validation, hold-line setback verification, and stand connectivity scoring.
 * **Dijkstra Ground Taxiway Routing**: Graph pathfinding over connected `TaxiwayGuidanceLine` networks with turn-by-turn ATC taxi clearances and hot spot crossing alerts.
 * **3D FAA Part 77 Obstacle Clearance Evaluation**: Evaluates vertical structures against 1:50 approach and 1:7 transitional clearance surfaces with exact margin or penetration metrics.
-* **Persistent Airport Data**: Airport metadata and complete feature records are stored in `do272_aerodromes` and `do272_features`. PostgreSQL is optional.
+* **Persistent Airport Data**: Baseline airport records use `do272_aerodromes` and `do272_features`; source snapshots use `do272_source_snapshots`. PostgreSQL is optional.
 * **Worldwide Open Data Ingestion**: Live Overpass API ingestion querying and classifying real-world aerodromes from OpenStreetMap worldwide (e.g. KJFK, KLAX, EHAM, LFPG, RJTT, WSSS) or custom FAA 18B GeoJSON.
 
 ---
@@ -65,6 +65,16 @@ A standards-compliant aeronautical GIS visualization, spatial engineering, and M
 ```
 
 The standalone stdio MCP server is a separate process from this web data path.
+
+### OpenStreetMap supplemental data
+
+OSM imports create dated, independently stored snapshots rather than replacing the airport baseline. The map shows unmatched and ambiguous OSM objects in pink by default; the snapshot selector can inspect earlier imports. Each object retains its OSM type, ID, tags, geometry, and available version and timestamp. Legacy imports have unknown capture times. OSM data is attributed to [OpenStreetMap contributors](https://www.openstreetmap.org/copyright); review the ODbL obligations before redistributing data.
+
+Matching is a review aid, not a validation: named compatible features are compared spatially, with runway direction pairs normalized. Connected same-reference line segments are grouped if their endpoints are within 3 m and align within 30 degrees. A spatial match requires at least 95% of sampled OSM vertices and midpoints within 20 m of a baseline feature. Name-only candidates, multiple candidates and attribute disagreements require review; curated values are never overwritten. The importer queries a bounding box, so results may include unrelated nearby features. Geometry, coverage and thresholds are not authoritative.
+
+Missing OSM values remain unknown; no runway dimensions, pavement ratings, operational status or airport elevation are fabricated. OSM data is display/review-only and excluded from routing, safety analysis and MCP tools. OSM-only airports have no baseline available for those tools. Neither source has been established as operationally authoritative.
+
+The OSM inspector displays candidate classes for supported objects, including apron polygons and windsocks. Holding positions without a clear subtype remain unclassified. These mappings are not proof of DO-272 compliance.
 
 ---
 
@@ -107,6 +117,8 @@ The platform provides a dual-surface MCP environment:
 ---
 
 ## Command-Line Open Data Batch Ingestion (Top 50 Airports & Custom Lists)
+
+**Caution:** The legacy batch CLIs synthesize demo features; they do not use the snapshot ingestion described above. The Node CLI uses bundled data for known seeds, and its SQL export replaces existing baseline records when applied. Do not treat synthetic output as OSM or operational airport data.
 
 You can batch-ingest aerodrome datasets from the command line using either **Node.js (`npm run ingest`)** or **Python (`ingest_open_data.py`)**.
 

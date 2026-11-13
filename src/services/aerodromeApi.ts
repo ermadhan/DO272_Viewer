@@ -1,4 +1,4 @@
-import type { AerodromeDataset } from '../types/do272';
+import type { AerodromeDataset, OsmSnapshot, OsmSnapshotInput } from '../types/do272';
 import type { DatabaseEngine } from './databaseSchema';
 
 export interface AerodromeSummary {
@@ -12,6 +12,15 @@ export interface AerodromeSummary {
 
 interface DatabaseEngineResponse {
   active_engine: DatabaseEngine;
+}
+
+export interface OsmSnapshotSummary {
+  id: number;
+  capturedAt: string | null;
+  osmTimestamp: string | null;
+  attribution: string;
+  legacy: boolean;
+  featureCount: number;
 }
 
 const API_BASE_URL = (
@@ -58,5 +67,20 @@ export function saveAerodromeDataset(
     method: 'PUT',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify(dataset),
+  });
+}
+
+export function getOsmSnapshots(icao: string): Promise<OsmSnapshotSummary[]> {
+  return requestJson(`/api/v1/aerodromes/${encodeURIComponent(icao)}/osm-snapshots`);
+}
+
+export function getOsmSnapshot(icao: string, id: number): Promise<OsmSnapshot> {
+  return requestJson(`/api/v1/aerodromes/${encodeURIComponent(icao)}/osm-snapshots/${id}`);
+}
+
+export function saveOsmSnapshot(snapshot: OsmSnapshotInput): Promise<OsmSnapshot> {
+  return requestJson(`/api/v1/aerodromes/${encodeURIComponent(snapshot.dataset.icao)}/osm-snapshots`, {
+    method: 'POST', headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(snapshot),
   });
 }

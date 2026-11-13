@@ -7,6 +7,9 @@ import React, { useEffect, useState, useMemo } from 'react';
 import {
   AerodromeDataset,
   AnyDO272Feature,
+  OsmFeature,
+  OsmSnapshot,
+  OsmSnapshotInput,
   TaxiRouteResult,
 } from './types/do272';
 import { fetchOsmAerodrome } from './data/aerodromes';
@@ -28,9 +31,14 @@ import {
   getAerodromeDataset,
   getAerodromes,
   getDatabaseEngine,
+  getOsmSnapshot,
+  getOsmSnapshots,
+  OsmSnapshotSummary,
   saveAerodromeDataset,
+  saveOsmSnapshot,
   setDatabaseEngine as switchDatabaseEngine,
 } from './services/aerodromeApi';
+import { osmCandidateClass, reconcileOsm } from './services/osmReconciliation';
 import { Loader2, RefreshCw } from 'lucide-react';
 
 export default function App() {
@@ -44,6 +52,12 @@ export default function App() {
   const [apiError, setApiError] = useState<string | null>(null);
   const [isLoadingDataset, setIsLoadingDataset] = useState(true);
   const [refreshKey, setRefreshKey] = useState(0);
+  const [osmSnapshots, setOsmSnapshots] = useState<OsmSnapshotSummary[]>([]);
+  const [osmSnapshotId, setOsmSnapshotId] = useState<number | null>(null);
+  const [osmSnapshot, setOsmSnapshot] = useState<OsmSnapshot | null>(null);
+  const [showOsm, setShowOsm] = useState(true);
+  const [selectedOsm, setSelectedOsm] = useState<OsmFeature | null>(null);
+  const [showReview, setShowReview] = useState(false);
 
   useEffect(() => {
     let cancelled = false;
@@ -81,10 +95,16 @@ export default function App() {
     setCurrentDataset(null);
     setIsLoadingDataset(true);
     setApiError(null);
-    getAerodromeDataset(selectedIcao)
-      .then((dataset) => {
+    setOsmSnapshot(null);
+    setOsmSnapshotId(null);
+    setOsmSnapshots([]);
+    setSelectedOsm(null);
+    Promise.all([getAerodromeDataset(selectedIcao), getOsmSnapshots(selectedIcao)])
+      .then(([dataset, snapshots]) => {
         if (cancelled) return;
         setCurrentDataset(dataset);
+        setOsmSnapshots(snapshots);
+        setOsmSnapshotId(snapshots[0]?.id ?? null);
         setIsLoadingDataset(false);
       })
       .catch((error: unknown) => {
@@ -97,6 +117,27 @@ export default function App() {
       cancelled = true;
     };
   }, [selectedIcao, databaseEngine, refreshKey]);
+
+  useEffect(() => {
+    if (!selectedIcao || osmSnapshotId === null) return;
+    let cancelled = false;
+    setOsmSnapshot(null);
+    getOsmSnapshot(selectedIcao, osmSnapshotId)
+      .then(snapshot => { if (!cancelled) setOsmSnapshot(snapshot); })
+      .catch((error: unknown) => {
+        if (!cancelled) setApiError(error instanceof Error ? error.message : 'Failed to load the OSM snapshot.');
+      });
+    return () => { cancelled = true; };
+  }, [selectedIcao, osmSnapshotId, databaseEngine]);
+
+  const osmGroups = useMemo(() =>
+    currentDataset && osmSnapshot ? reconcileOsm(currentDataset, osmSnapshot.dataset.features) : [],
+    [currentDataset, osmSnapshot]);
+  const supplementalFeatures = useMemo(() => showOsm
+    ? osmGroups.filter(group => group.status !== 'matched').flatMap(group => group.features)
+    : [], [showOsm, osmGroups]);
+  const osmReviewGroups = useMemo(() =>
+    osmGroups.filter(group => group.status === 'ambiguous' || group.conflicts.length > 0), [osmGroups]);
 
   // Layer Visibility State
   const [layers, setLayers] = useState<LayerVisibilityState>({
@@ -182,13 +223,23 @@ export default function App() {
   const handleSyncLiveOsm = async () => {
     setIsFetchingLiveOsm(true);
     try {
-      const liveDataset = await fetchOsmAerodrome(selectedIcao);
-      await handleDatasetLoaded(liveDataset);
+      const snapshot = await fetchOsmAerodrome(selectedIcao);
+      await handleOsmLoaded(snapshot);
     } catch (error: unknown) {
       setApiError(error instanceof Error ? error.message : 'Failed to save live OSM data to the database.');
     } finally {
       setIsFetchingLiveOsm(false);
     }
+  };
+
+  const handleOsmLoaded = async (snapshot: OsmSnapshotInput) => {
+    await saveOsmSnapshot(snapshot);
+    setSelectedIcao(snapshot.dataset.icao);
+    setRefreshKey(key => key + 1);
+    setApiError(null);
+    setActiveRoute(null);
+    setSelectedFeature(null);
+    setSelectedOsm(null);
   };
 
   const handleSelectIcao = (icao: string) => {
@@ -265,14 +316,14 @@ export default function App() {
             <div className="flex items-center gap-3">
               <div className="flex items-center gap-1.5 text-slate-200">
                 <span className="text-white font-bold">{currentDataset.name}</span>
-                <span className="text-sky-400">({currentDataset.icao} / {currentDataset.iata})</span>
+                <span className="text-sky-400">({currentDataset.icao}{currentDataset.iata ? ` / ${currentDataset.iata}` : ''})</span>
               </div>
               <span>·</span>
-              <span>{currentDataset.city}, {currentDataset.country}</span>
+              <span>{[currentDataset.city, currentDataset.country].filter(Boolean).join(', ') || 'Location unknown'}</span>
               <span>·</span>
-              <span className="text-slate-300">Elev: {currentDataset.elevationMeters}m AMSL</span>
+              <span className="text-slate-300">Elev: {currentDataset.elevationMeters === null ? 'Unknown' : `${currentDataset.elevationMeters}m AMSL`}</span>
               <span>·</span>
-              <span>Mag Var: {currentDataset.magneticVariation}</span>
+              <span>Mag Var: {currentDataset.magneticVariation || 'Unknown'}</span>
             </div>
 
             <div className="flex items-center gap-3">
@@ -299,10 +350,58 @@ export default function App() {
               <span className="text-emerald-400 text-[11px]">{currentDataset.source}</span>
               <span>·</span>
               <span className="text-slate-300 tabular-nums">
-                {currentDataset.features.length} DO-272 Entities
+                {currentDataset.features.length} baseline entities
               </span>
             </div>
           </div>
+
+          <div className="flex items-center gap-4 border-b border-slate-800 bg-slate-900 px-6 py-2 text-xs">
+            <label className="flex items-center gap-2 text-pink-300">
+              <input type="checkbox" checked={showOsm} onChange={event => setShowOsm(event.target.checked)} />
+              Show supplemental OSM ({showOsm ? supplementalFeatures.length : 'hidden'})
+            </label>
+            {osmSnapshots.length > 0 && (
+              <>
+                <label className="text-slate-300">
+                  Snapshot:{' '}
+                  <select className="bg-slate-800 text-white" value={osmSnapshotId ?? ''}
+                    onChange={event => { setSelectedOsm(null); setOsmSnapshotId(Number(event.target.value)); }}>
+                    {osmSnapshots.map(snapshot => (
+                      <option key={snapshot.id} value={snapshot.id}>
+                        {snapshot.capturedAt || 'Legacy — time unknown'} ({snapshot.featureCount})
+                      </option>
+                    ))}
+                  </select>
+                </label>
+                <button className="text-amber-300 underline" onClick={() => setShowReview(value => !value)}>
+                  Review {osmReviewGroups.length} flagged groups
+                </button>
+                <span className="text-slate-400">{osmGroups.filter(group => group.status === 'ambiguous').length} ambiguous groups</span>
+                <a className="text-slate-400 underline" href="https://www.openstreetmap.org/copyright" target="_blank" rel="noreferrer">© OpenStreetMap contributors</a>
+              </>
+            )}
+            {currentDataset.source === 'OpenStreetMap Aeroway Ingest' && (
+              <span className="text-amber-300">No curated baseline. OSM is display-only.</span>
+            )}
+          </div>
+          {showReview && osmSnapshot && (
+            <div className="max-h-40 overflow-auto border-b border-amber-900 bg-slate-950 px-6 py-2 text-xs">
+              <p className="mb-1 text-slate-400">Heuristic matches or name-only candidates; verify differences against authoritative data. OSM features come from a bounding box and may include other airports.</p>
+              {osmReviewGroups.length === 0 && <p className="text-slate-400">No conflicts or ambiguous matches found.</p>}
+              {osmReviewGroups.map(group => (
+                <div key={group.features[0].id} className="text-amber-200">
+                  <button className="underline" onClick={() => {
+                    setSelectedFeature(null);
+                    setSelectedOsm(group.features[0]);
+                    setActiveTab('map');
+                  }}>{group.curated?.designator || group.features[0].designator || 'Unnamed'}</button>
+                  {' '}({group.features.map(f => `${f.osmType}/${f.osmId}`).join(', ')}):{' '}
+                  {group.status === 'ambiguous' && 'Ambiguous match. '}
+                  {group.conflicts.map(c => `${c.field}: curated ${c.curated}, OSM ${c.osm}`).join('; ')}
+                </div>
+              ))}
+            </div>
+          )}
 
           <div className="relative flex-1 w-full h-full overflow-hidden flex">
             {activeTab === 'features' ? (
@@ -310,7 +409,7 @@ export default function App() {
                 dataset={currentDataset}
                 databaseEngine={databaseEngine}
                 selectedFeature={selectedFeature}
-                onSelectFeature={(feat) => setSelectedFeature(feat)}
+                onSelectFeature={(feat) => { setSelectedOsm(null); setSelectedFeature(feat); }}
                 onNavigateToMap={(feat) => {
                   if (feat) setSelectedFeature(feat);
                   setActiveTab('map');
@@ -326,6 +425,8 @@ export default function App() {
                     selectedFeature={selectedFeature}
                     onSelectFeature={(feat) => setSelectedFeature(feat)}
                     highlightedFeatureIds={highlightedFeatureIds}
+                    supplementalFeatures={supplementalFeatures}
+                    onSelectOsmFeature={feature => { setSelectedFeature(null); setSelectedOsm(feature); }}
                   />
 
                   {(activeTab === 'map' || activeTab === 'routing') && (
@@ -347,9 +448,25 @@ export default function App() {
                       />
                     </div>
                   )}
+                  {selectedOsm && (
+                    <div className="absolute top-4 right-4 z-20 max-h-[70vh] w-80 overflow-auto rounded-xl border border-pink-900 bg-slate-900 p-4 text-xs">
+                      <button className="float-right text-slate-300" onClick={() => setSelectedOsm(null)}>Close</button>
+                      <h3 className="font-bold text-pink-300">Supplemental OSM {selectedOsm.aeroway}</h3>
+                      <p>{selectedOsm.designator || 'Designator unknown'}</p>
+                      <p>Object: {selectedOsm.osmType}/{selectedOsm.osmId}</p>
+                      <p>Version: {selectedOsm.version ?? 'Unknown'} · Updated: {selectedOsm.timestamp ?? 'Unknown'}</p>
+                      <p>OSM database timestamp: {osmSnapshot?.osmTimestamp ?? 'Unknown'}</p>
+                      <p>Geometry: {selectedOsm.geometryType}</p>
+                      <p>Candidate class: {osmCandidateClass(selectedOsm) || 'Unclassified'}</p>
+                      <pre className="mt-2 whitespace-pre-wrap break-all text-slate-300">{JSON.stringify(selectedOsm.tags, null, 2)}</pre>
+                    </div>
+                  )}
                 </div>
 
-                {(activeTab === 'routing' || activeTab === 'obstacles' || activeTab === 'sql') && (
+                {currentDataset.source === 'OpenStreetMap Aeroway Ingest' && activeTab !== 'map' && (
+                  <div className="w-[400px] p-6 text-amber-300">No curated baseline is available. Supplemental OSM is excluded from analysis and MCP tools.</div>
+                )}
+                {currentDataset.source !== 'OpenStreetMap Aeroway Ingest' && (activeTab === 'routing' || activeTab === 'obstacles' || activeTab === 'sql') && (
                   <div className="w-[520px] h-full z-30 p-3 bg-slate-950/90 backdrop-blur-md border-l border-slate-800 shadow-2xl flex flex-col">
                     <SpatialAnalysisHUD
                       dataset={currentDataset}
@@ -362,13 +479,13 @@ export default function App() {
                   </div>
                 )}
 
-                {activeTab === 'mcp' && (
+                {currentDataset.source !== 'OpenStreetMap Aeroway Ingest' && activeTab === 'mcp' && (
                   <div className="w-[640px] h-full z-30 p-3 bg-slate-950/90 backdrop-blur-md border-l border-slate-800 shadow-2xl flex flex-col">
                     <MCPStudio dataset={currentDataset} onSwitchToAgent={() => setActiveTab('agent')} />
                   </div>
                 )}
 
-                {activeTab === 'agent' && (
+                {currentDataset.source !== 'OpenStreetMap Aeroway Ingest' && activeTab === 'agent' && (
                   <div className="w-[660px] h-full z-30 p-3 bg-slate-950/95 backdrop-blur-md border-l border-slate-800 shadow-2xl flex flex-col">
                     <MCPAgentChat
                       dataset={currentDataset}
@@ -414,6 +531,7 @@ export default function App() {
         isOpen={isIngestOpen}
         onClose={() => setIsIngestOpen(false)}
         onDatasetLoaded={handleDatasetLoaded}
+        onOsmLoaded={handleOsmLoaded}
       />
 
       <DO272CatalogueModal

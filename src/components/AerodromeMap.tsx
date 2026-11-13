@@ -3,6 +3,7 @@ import L from 'leaflet';
 import {
   AerodromeDataset,
   AnyDO272Feature,
+  OsmFeature,
   TaxiRouteResult,
 } from '../types/do272';
 import { LayerVisibilityState } from './LayerControls';
@@ -15,6 +16,8 @@ interface AerodromeMapProps {
   selectedFeature: AnyDO272Feature | null;
   onSelectFeature: (feature: AnyDO272Feature | null) => void;
   highlightedFeatureIds: string[];
+  supplementalFeatures: OsmFeature[];
+  onSelectOsmFeature: (feature: OsmFeature) => void;
 }
 
 type BaseMapType = 'dark' | 'satellite' | 'osm' | 'positron';
@@ -49,11 +52,14 @@ export const AerodromeMap: React.FC<AerodromeMapProps> = ({
   selectedFeature,
   onSelectFeature,
   highlightedFeatureIds,
+  supplementalFeatures,
+  onSelectOsmFeature,
 }) => {
   const mapContainerRef = useRef<HTMLDivElement>(null);
   const mapInstanceRef = useRef<L.Map | null>(null);
   const tileLayerRef = useRef<L.TileLayer | null>(null);
   const featureLayerGroupRef = useRef<L.LayerGroup | null>(null);
+  const osmLayerGroupRef = useRef<L.LayerGroup | null>(null);
   const routeLayerGroupRef = useRef<L.LayerGroup | null>(null);
 
   const [baseMap, setBaseMap] = useState<BaseMapType>('osm');
@@ -85,6 +91,7 @@ export const AerodromeMap: React.FC<AerodromeMapProps> = ({
 
       const routeGroup = L.layerGroup().addTo(map);
       routeLayerGroupRef.current = routeGroup;
+      osmLayerGroupRef.current = L.layerGroup().addTo(map);
 
       map.on('zoomend', () => {
         setCurrentZoom(map.getZoom());
@@ -523,6 +530,30 @@ export const AerodromeMap: React.FC<AerodromeMapProps> = ({
     });
   }, [dataset, layers, highlightedFeatureIds, selectedFeature]);
 
+  useEffect(() => {
+    const group = osmLayerGroupRef.current;
+    if (!group) return;
+    group.clearLayers();
+    supplementalFeatures.forEach(feature => {
+      let layer: L.Path;
+      if (feature.geometryType === 'Point') {
+        layer = L.circleMarker(feature.coordinates as [number, number], {
+          radius: 5, color: '#f472b6', fillOpacity: 0.6,
+        });
+      } else {
+        const points = feature.coordinates as [number, number][];
+        layer = feature.geometryType === 'Polygon'
+          ? L.polygon(points, { color: '#f472b6', weight: 2, fillOpacity: 0.15, dashArray: '5, 4' })
+          : L.polyline(points, { color: '#f472b6', weight: 2, dashArray: '5, 4' });
+      }
+      const label = document.createElement('span');
+      label.textContent = `OSM ${feature.aeroway}: ${feature.designator || feature.osmId}`;
+      layer.bindTooltip(label);
+      layer.on('click', () => onSelectOsmFeature(feature));
+      layer.addTo(group);
+    });
+  }, [supplementalFeatures, onSelectOsmFeature]);
+
   // Render Active Taxiway Route
   useEffect(() => {
     if (!routeLayerGroupRef.current) return;
@@ -580,6 +611,11 @@ export const AerodromeMap: React.FC<AerodromeMapProps> = ({
     <div className="relative w-full h-full bg-slate-950 overflow-hidden">
       {/* Map Canvas */}
       <div ref={mapContainerRef} className="w-full h-full z-0" />
+      {supplementalFeatures.length > 0 && (
+        <div className="absolute bottom-1 left-1 z-10 rounded bg-slate-950/90 px-2 py-1 text-[10px] text-slate-200">
+          © <a href="https://www.openstreetmap.org/copyright" target="_blank" rel="noreferrer" className="underline">OpenStreetMap contributors</a> · supplemental, not for operational use
+        </div>
+      )}
 
       {/* Floating HUD Base Map Selector */}
       <div className="absolute top-4 left-4 z-10 flex items-center gap-1 bg-slate-900/90 backdrop-blur-md p-1 rounded-lg border border-slate-800 shadow-lg text-xs font-mono">

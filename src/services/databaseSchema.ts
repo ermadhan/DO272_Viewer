@@ -99,6 +99,33 @@ CREATE TABLE IF NOT EXISTS do272_features (
 );
 CREATE INDEX IF NOT EXISTS idx_do272_features_class ON do272_features(feature_class);`,
   },
+  {
+    tableName: 'do272_source_snapshots',
+    featureClass: 'Dated source snapshots',
+    columns: [
+      { name: 'id', typePostgres: 'SERIAL PRIMARY KEY', typeSqlite: 'INTEGER PRIMARY KEY', description: 'Snapshot identifier' },
+      { name: 'aerodrome_id', typePostgres: 'VARCHAR(10) NOT NULL', typeSqlite: 'TEXT NOT NULL', description: 'Airport identifier' },
+      { name: 'source_kind', typePostgres: 'VARCHAR(20) NOT NULL', typeSqlite: 'TEXT NOT NULL', description: 'Source type' },
+      { name: 'captured_at', typePostgres: 'VARCHAR(40)', typeSqlite: 'TEXT', description: 'Capture time; unknown for legacy data' },
+      { name: 'payload', typePostgres: 'JSON NOT NULL', typeSqlite: 'JSON NOT NULL', description: 'Source dataset, provenance and attribution' },
+    ],
+    postgresDDL: `CREATE TABLE IF NOT EXISTS do272_source_snapshots (
+  id SERIAL PRIMARY KEY,
+  aerodrome_id VARCHAR(10) NOT NULL,
+  source_kind VARCHAR(20) NOT NULL,
+  captured_at VARCHAR(40),
+  payload JSON NOT NULL
+);
+CREATE INDEX IF NOT EXISTS ix_do272_source_snapshots_aerodrome_id ON do272_source_snapshots(aerodrome_id);`,
+    sqliteDDL: `CREATE TABLE IF NOT EXISTS do272_source_snapshots (
+  id INTEGER PRIMARY KEY,
+  aerodrome_id TEXT NOT NULL,
+  source_kind TEXT NOT NULL,
+  captured_at TEXT,
+  payload JSON NOT NULL
+);
+CREATE INDEX IF NOT EXISTS ix_do272_source_snapshots_aerodrome_id ON do272_source_snapshots(aerodrome_id);`,
+  },
 ];
 
 export function generateFullDdlScript(engine: DatabaseEngine): string {

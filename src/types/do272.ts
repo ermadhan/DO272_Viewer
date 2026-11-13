@@ -220,11 +220,36 @@ export interface AerodromeDataset {
   city: string;
   country: string;
   center: [number, number]; // [lat, lng]
-  elevationMeters: number;
+  elevationMeters: number | null;
   magneticVariation: string;
-  transitionAltitudeFt: number;
+  transitionAltitudeFt: number | null;
   source: 'Curated Hub (DO-272/ED-99)' | 'US FAA Airport GIS 18B' | 'OpenStreetMap Aeroway Ingest';
   features: AnyDO272Feature[];
+}
+
+export interface OsmFeature {
+  id: string;
+  osmType: 'node' | 'way' | 'relation';
+  osmId: number;
+  version: number | null;
+  timestamp: string | null;
+  aeroway: string;
+  designator: string;
+  geometryType: 'Point' | 'LineString' | 'Polygon';
+  coordinates: [number, number] | [number, number][];
+  tags: Record<string, string>;
+}
+
+export interface OsmSnapshotInput {
+  dataset: Omit<AerodromeDataset, 'features'> & { features: OsmFeature[] };
+  osmTimestamp: string | null;
+  attribution: string;
+}
+
+export interface OsmSnapshot extends OsmSnapshotInput {
+  id: number;
+  capturedAt: string | null;
+  legacy?: boolean;
 }
 
 export interface TaxiRouteResult {

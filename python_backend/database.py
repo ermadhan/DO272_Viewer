@@ -2,6 +2,7 @@
 
 import json
 import os
+from copy import deepcopy
 from pathlib import Path
 from typing import Any, Literal
 
@@ -81,6 +82,77 @@ class AerodromeFeatureModel(Base):
     payload = Column(JSON, nullable=False)
 
     aerodrome = relationship("AerodromeModel", back_populates="feature_rows")
+
+
+class SourceSnapshotModel(Base):
+    __tablename__ = "do272_source_snapshots"
+
+    id = Column(Integer, primary_key=True, autoincrement=True)
+    aerodrome_id = Column(String(10), nullable=False, index=True)
+    source_kind = Column(String(20), nullable=False)
+    captured_at = Column(String(40), nullable=True)
+    payload = Column(JSON, nullable=False)
+
+
+def sanitize_legacy_osm(dataset: dict[str, Any]) -> dict[str, Any]:
+    """Keep legacy OSM data while removing attributes invented by the old importer."""
+    result = deepcopy(dataset)
+    result["iata"] = ""
+    result["city"] = ""
+    result["country"] = ""
+    result["elevationMeters"] = None
+    result["magneticVariation"] = ""
+    result["transitionAltitudeFt"] = None
+    features = []
+    for feature in result["features"]:
+        tags = feature.get("properties", {}).get("osmTags", {})
+        coordinates = feature.get("coordinates")
+        if not coordinates:
+            raise ValueError(f"Legacy OSM feature {feature.get('id')} has no geometry")
+        is_point = isinstance(coordinates[0], (float, int))
+        osm_type = "node" if is_point else "way"
+        feature_id = str(feature.get("id", ""))
+        osm_id = feature_id.rsplit("-", 1)[-1]
+        if not osm_id.isdigit():
+            raise ValueError(f"Legacy OSM feature {feature_id} has no OSM identifier")
+        features.append({
+            "id": f"OSM-{osm_type}-{osm_id}", "osmType": osm_type, "osmId": int(osm_id),
+            "version": None, "timestamp": None, "aeroway": tags.get("aeroway", ""),
+            "designator": tags.get("ref") or tags.get("name") or "",
+            "geometryType": "Point" if is_point else "LineString",
+            "coordinates": coordinates, "tags": tags,
+        })
+    result["features"] = features
+    return result
+
+
+def add_source_snapshot(session, icao: str, kind: str, payload: dict[str, Any],
+                        captured_at: str | None = None) -> SourceSnapshotModel:
+    snapshot = SourceSnapshotModel(
+        aerodrome_id=icao, source_kind=kind, captured_at=captured_at, payload=payload
+    )
+    session.add(snapshot)
+    session.flush()
+    return snapshot
+
+
+def snapshot_payload(snapshot: SourceSnapshotModel) -> dict[str, Any]:
+    payload = snapshot.payload
+    dataset = payload["dataset"]
+    if snapshot.source_kind == "osm" and payload.get("legacy") and any(
+        "osmType" not in feature for feature in dataset.get("features", [])
+    ):
+        return {**payload, "dataset": sanitize_legacy_osm(dataset)}
+    return payload
+
+
+def latest_snapshot(session, icao: str, kind: str) -> SourceSnapshotModel | None:
+    return (
+        session.query(SourceSnapshotModel)
+        .filter_by(aerodrome_id=icao, source_kind=kind)
+        .order_by(SourceSnapshotModel.id.desc())
+        .first()
+    )
 
 
 _engines: dict[str, Engine] = {}
@@ -237,6 +309,19 @@ def initialize_database(engine_name: DatabaseEngine | None = None) -> None:
             icao = str(dataset["icao"]).strip().upper()
             if session.get(AerodromeModel, icao) is None:
                 upsert_dataset(session, dataset)
+        session.flush()
+        for aerodrome in session.query(AerodromeModel).all():
+            icao = str(aerodrome.icao)
+            if aerodrome.source == "OpenStreetMap Aeroway Ingest":
+                if latest_snapshot(session, icao, "osm") is None:
+                    add_source_snapshot(
+                        session, icao, "osm",
+                        {"dataset": sanitize_legacy_osm(serialize_dataset(aerodrome)),
+                         "attribution": "OpenStreetMap contributors",
+                         "osmTimestamp": None, "legacy": True},
+                    )
+                if icao in seed_datasets and latest_snapshot(session, icao, "curated") is None:
+                    add_source_snapshot(session, icao, "curated", {"dataset": seed_datasets[icao]})
         session.commit()
     finally:
         session.close()

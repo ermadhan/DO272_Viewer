@@ -1,18 +1,20 @@
 import React, { useState } from 'react';
 import { X, Download, Globe, FileCode, CheckCircle, AlertCircle, Loader2 } from 'lucide-react';
-import { AerodromeDataset } from '../types/do272';
+import { AerodromeDataset, OsmSnapshotInput } from '../types/do272';
 import { fetchOsmAerodrome } from '../data/aerodromes';
 
 interface DataIngestModalProps {
   isOpen: boolean;
   onClose: () => void;
   onDatasetLoaded: (dataset: AerodromeDataset) => Promise<void>;
+  onOsmLoaded: (snapshot: OsmSnapshotInput) => Promise<void>;
 }
 
 export const DataIngestModal: React.FC<DataIngestModalProps> = ({
   isOpen,
   onClose,
   onDatasetLoaded,
+  onOsmLoaded,
 }) => {
   const [activeIngestTab, setActiveIngestTab] = useState<'osm' | 'faa'>('osm');
   const [searchIcao, setSearchIcao] = useState<string>('KJFK');
@@ -32,10 +34,10 @@ export const DataIngestModal: React.FC<DataIngestModalProps> = ({
     setIsError(false);
 
     try {
-      const dataset = await fetchOsmAerodrome(searchIcao);
-      await onDatasetLoaded(dataset);
+      const snapshot = await fetchOsmAerodrome(searchIcao);
+      await onOsmLoaded(snapshot);
       setStatusMessage(
-        `Saved ${dataset.features.length} DO-272 features for ${dataset.name} to the database.`
+        `Saved ${snapshot.dataset.features.length} OSM features for ${snapshot.dataset.name} to the database.`
       );
       onClose();
     } catch (err: unknown) {
@@ -160,7 +162,7 @@ export const DataIngestModal: React.FC<DataIngestModalProps> = ({
             <div className="space-y-4">
               <div>
                 <label className="text-[11px] text-slate-400 uppercase tracking-wider block mb-1.5">
-                  Enter Airport ICAO or IATA Code (Worldwide)
+                  Enter Airport ICAO Code (Worldwide)
                 </label>
                 <div className="flex gap-2">
                   <input

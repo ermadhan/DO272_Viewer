@@ -28,7 +28,7 @@ import { Loader2, RefreshCw } from 'lucide-react';
 export default function App() {
   // Navigation & View State
   const [activeTab, setActiveTab] = useState<'map' | 'features' | 'routing' | 'obstacles' | 'sql' | 'mcp' | 'agent' | 'windows'>('map');
-  const [databaseEngine, setDatabaseEngine] = useState<DatabaseEngine>('postgres');
+  const [databaseEngine, setDatabaseEngine] = useState<DatabaseEngine>('sqlite');
   const [isFetchingLiveOsm, setIsFetchingLiveOsm] = useState<boolean>(false);
   const [selectedIcao, setSelectedIcao] = useState<string>('KSFO');
   const [customDatasets, setCustomDatasets] = useState<Record<string, AerodromeDataset>>({});

@@ -20,6 +20,11 @@ interface AerodromeMapProps {
 type BaseMapType = 'dark' | 'satellite' | 'osm' | 'positron';
 
 const BASE_MAPS: Record<BaseMapType, { name: string; url: string; attribution: string }> = {
+  osm: {
+    name: 'OpenStreetMap',
+    url: 'https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png',
+    attribution: '&copy; OpenStreetMap contributors',
+  },
   dark: {
     name: 'Radar Dark',
     url: 'https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png',
@@ -29,12 +34,7 @@ const BASE_MAPS: Record<BaseMapType, { name: string; url: string; attribution: s
     name: 'Satellite Ortho',
     url: 'https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}',
     attribution: 'Tiles &copy; Esri &mdash; Source: Esri, i-cubed, USDA, USGS, AEX, GeoEye',
-  },
-  osm: {
-    name: 'OpenStreetMap',
-    url: 'https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png',
-    attribution: '&copy; OpenStreetMap contributors',
-  },
+  },  
   positron: {
     name: 'Positron Chart',
     url: 'https://{s}.basemaps.cartocdn.com/light_all/{z}/{x}/{y}{r}.png',
@@ -56,7 +56,7 @@ export const AerodromeMap: React.FC<AerodromeMapProps> = ({
   const featureLayerGroupRef = useRef<L.LayerGroup | null>(null);
   const routeLayerGroupRef = useRef<L.LayerGroup | null>(null);
 
-  const [baseMap, setBaseMap] = useState<BaseMapType>('dark');
+  const [baseMap, setBaseMap] = useState<BaseMapType>('osm');
   const [currentZoom, setCurrentZoom] = useState<number>(14);
 
   // Initialize Map

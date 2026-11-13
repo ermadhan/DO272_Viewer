@@ -4,13 +4,18 @@
  * and Leaflet map synchronization across all 4 hub airports.
  */
 
-import { PRELOADED_AERODROMES } from '../src/data/aerodromes';
+import { readFileSync } from 'node:fs';
+import { AerodromeDataset } from '../src/types/do272';
 import {
   REGISTERED_MCP_TOOLS,
   executeMCPTool,
   runMCPAgent,
   JsonRpcResponse,
 } from '../src/services/mcpAgentService';
+
+const PRELOADED_AERODROMES = JSON.parse(
+  readFileSync(new URL('../python_backend/seed_data/airports.json', import.meta.url), 'utf8')
+) as Record<string, AerodromeDataset>;
 
 let passed = 0;
 let total = 0;

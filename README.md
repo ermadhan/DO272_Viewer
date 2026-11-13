@@ -20,7 +20,7 @@ An experimental aeronautical GIS visualization, spatial analysis, and Model Cont
 
 * **Database-backed Interactive Aeronautical Map**: Loads airport metadata and DO-272 features from the Python API; SQLite is the default database.
 * **Autonomous In-App MCP AI Agent Client**: Conversational AI assistant with strategy/thought traces, JSON-RPC 2.0 tool execution inspection, and one-click "Sync & View on Map" actions.
-* **Python stdio MCP Server**: Standard Model Context Protocol server (`python_backend/mcp_server.py`) exposing DO-272 spatial analysis capabilities to Claude Desktop, Cursor, or external LLM workflows.
+* **Python stdio MCP Server**: MCP feature queries for Claude Desktop, Cursor, or external LLM workflows, backed by the running Python API.
 * **Automated DO-272 Data Quality Requirement (DQR) Audits**: Geometry closure checks, duplicate vertex filtering, 5-part ICAO PCN syntax validation, hold-line setback verification, and stand connectivity scoring.
 * **Dijkstra Ground Taxiway Routing**: Graph pathfinding over connected `TaxiwayGuidanceLine` networks with turn-by-turn ATC taxi clearances and hot spot crossing alerts.
 * **3D FAA Part 77 Obstacle Clearance Evaluation**: Evaluates vertical structures against 1:50 approach and 1:7 transitional clearance surfaces with exact margin or penetration metrics.
@@ -64,7 +64,7 @@ An experimental aeronautical GIS visualization, spatial analysis, and Model Cont
 +---------------------------------------------------------------------------------+
 ```
 
-The standalone stdio MCP server is a separate process from this web data path.
+The standalone stdio MCP server is a separate process that reads the active dataset through the Python API. It follows the API's currently selected database and reviewed snapshot.
 
 ### OpenStreetMap supplemental data
 
@@ -125,8 +125,9 @@ The platform provides a dual-surface MCP environment:
    * Features collapsible **Strategy & Reasoning Traces**, payload inspectors, and **"Sync & View on Map"** buttons.
 
 2. **Standalone Python MCP Server (`python_backend/mcp_server.py`)**:
-   * Standard stdio transport compliant with the Model Context Protocol specification.
-   * Can be added directly to Claude Desktop, Cursor, or any MCP-compatible client.
+   * Provides `do272_query_features`, returning full baseline feature records from the running backend API. OSM-only airports are marked as having no baseline.
+   * Routing, obstacle clearance, compliance validation and spatial SQL return explicit unavailable errors rather than sample results. The separate in-app agent and MCP Studio have their own implementations and may still show simulated results.
+   * Data and results are experimental, not operationally validated.
 
 ---
 
@@ -243,11 +244,12 @@ Open a second Command Prompt or PowerShell window in the project folder:
 cd python_backend
 ```
 
-The batch file from the previous step creates the virtual environment and installs the backend dependencies. Start the stdio MCP server with:
+Keep the backend running. The batch file from the previous step creates the virtual environment and installs the backend dependencies. Start the stdio MCP server with:
 ```cmd
 call venv\Scripts\activate
 python mcp_server.py
 ```
+The server reads `http://127.0.0.1:8000` by default. Set `DO272_API_URL` in the MCP process to the backend's base URL if it differs. Configure `SQLITE_URL`, `DATABASE_ENGINE` or `POSTGRES_URL` in the **backend** process, not the MCP process. Switching engines in the UI affects queries through that same backend. If the backend is unavailable, the MCP tool reports an error.
 
 ### Step 5: (Optional) Run Local PostgreSQL via Docker
 To run a local PostgreSQL database on port 5432:
@@ -274,27 +276,9 @@ python -m unittest python_backend.test_database_api
 These tests verify that seeded airports are served from the database and that imported features persist across reads.
 
 ### 2. Python stdio MCP Client Test Suite
-Tests tool discovery (`tools/list`), execution of all 5 tools (`tools/call`), and JSON-RPC 2.0 error handling (`-32601`):
+Tests database-backed feature queries, snapshot activation, unavailable tools and JSON-RPC errors against an isolated temporary database:
 ```cmd
-python python_backend/test_mcp_client.py
-```
-*Expected Output*:
-```
-======================================================================
-  DO-272 MODEL CONTEXT PROTOCOL (MCP) CLIENT TEST HARNESS
-  Testing stdio JSON-RPC 2.0 interface on mcp_server.py
-======================================================================
-✅ [PASS] 1. tools/list - Tool Discovery & Registration (86.5ms)
-✅ [PASS] 2. do272_validate_compliance - Quality & DQR Audit (0.5ms)
-✅ [PASS] 3. do272_find_taxi_route - Dijkstra Graph Routing (0.3ms)
-✅ [PASS] 4. do272_obstacle_clearance_check - 3D Part 77 Clearance (0.3ms)
-✅ [PASS] 5. do272_query_features - Spatial Query (0.3ms)
-✅ [PASS] 6. do272_spatial_sql - PostGIS SQL Execution (0.3ms)
-✅ [PASS] 7. Unknown Tool Handling - Error Code -32601 (0.2ms)
-----------------------------------------------------------------------
-Test Suite Summary: 7/7 Passed (100.0%)
-======================================================================
-ALL DO-272 MCP CLIENT TESTS PASSED SUCCESSFULLY! 🚀
+python python_backend\test_mcp_client.py
 ```
 
 ### 3. TypeScript In-App MCP Client & Agent E2E Suite
@@ -354,18 +338,13 @@ You can connect the Python MCP server to desktop LLM tools like Claude Desktop o
            "C:\\path\\to\\do272-aerodrome-gis\\python_backend\\mcp_server.py"
          ],
          "env": {
-           "POSTGRES_URL": "postgresql://postgres:postgrespassword@localhost:5432/do272_aerodromes"
+           "DO272_API_URL": "http://127.0.0.1:8000"
          }
        }
      }
    }
    ```
-3. Restart Claude Desktop. The hammer icon will appear with access to:
-   * `do272_validate_compliance`
-   * `do272_find_taxi_route`
-   * `do272_obstacle_clearance_check`
-   * `do272_query_features`
-   * `do272_spatial_sql`
+3. Keep the backend running and restart Claude Desktop. Use `do272_query_features` to read its active baseline. The other four listed tools report that they are unavailable.
 
 ---
 

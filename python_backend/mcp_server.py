@@ -1,35 +1,30 @@
-"""
-DO-272 Aerodrome Model Context Protocol (MCP) Server
-Exposes PostGIS spatial tools and aerodrome query capabilities to LLM clients (Claude Desktop, Cursor).
-"""
+"""DO-272 stdio MCP server backed by the aerodrome API."""
 
-import sys
-import json
 import asyncio
-from typing import Any, Dict, List
+import json
+import os
+import re
+import sys
+from typing import Any
+from urllib.error import HTTPError, URLError
+from urllib.request import urlopen
 
-# Standard MCP tool definitions
+
 DO272_TOOLS = [
     {
         "name": "do272_query_features",
-        "description": "Query RTCA DO-272 aerodrome features by feature class (RunwayElement, TaxiwayElement, ParkingStandArea, HotSpot, VerticalStructure, etc.) and ICAO code.",
+        "description": (
+            "Read baseline features from the backend's active database and reviewed "
+            "curated snapshot. OSM supplemental features are excluded. Data is not "
+            "verified for operational use."
+        ),
         "inputSchema": {
             "type": "object",
             "properties": {
-                "icao": {"type": "string", "description": "ICAO airport code (e.g., KSFO, EGLL, EDDF, OMDB)"},
+                "icao": {"type": "string", "description": "Four-letter ICAO airport code"},
                 "feature_class": {
                     "type": "string",
-                    "description": "DO-272 feature class name or 'all'",
-                    "enum": [
-                        "all",
-                        "RunwayElement",
-                        "TaxiwayElement",
-                        "TaxiwayGuidanceLine",
-                        "ParkingStandArea",
-                        "HotSpot",
-                        "VerticalStructure",
-                        "LocalizerAntenna",
-                    ],
+                    "description": "Exact DO-272 feature class name, or 'all' (default)",
                 },
             },
             "required": ["icao"],
@@ -37,215 +32,146 @@ DO272_TOOLS = [
     },
     {
         "name": "do272_find_taxi_route",
-        "description": "Calculate shortest ground taxi path between a runway exit and parking stand using DO-272 TaxiwayGuidanceLine graph topology.",
+        "description": "Unavailable: real backend taxi routing is not implemented.",
         "inputSchema": {
             "type": "object",
             "properties": {
-                "icao": {"type": "string", "description": "ICAO airport code"},
-                "origin": {"type": "string", "description": "Origin taxiway point or runway exit (e.g. Exit 28L @ F)"},
-                "destination": {"type": "string", "description": "Destination gate or stand (e.g. Gate A6)"},
+                "icao": {"type": "string"},
+                "origin": {"type": "string"},
+                "destination": {"type": "string"},
             },
             "required": ["icao", "origin", "destination"],
         },
     },
     {
         "name": "do272_obstacle_clearance_check",
-        "description": "Evaluate aerodrome vertical structures against 3D FAA Part 77 / ICAO Annex 14 imaginary approach and transitional clearance surfaces.",
+        "description": "Unavailable: real backend obstacle clearance analysis is not implemented.",
         "inputSchema": {
             "type": "object",
-            "properties": {
-                "icao": {"type": "string", "description": "ICAO airport code"},
-            },
+            "properties": {"icao": {"type": "string"}},
             "required": ["icao"],
         },
     },
     {
         "name": "do272_validate_compliance",
-        "description": "Validate aerodrome spatial data against RTCA DO-272 / EUROCAE ED-99 Data Quality Requirements (DQRs), geometry closure, taxiway network connectivity, PCN syntax, and hold line distances, returning an audit report with identified inconsistencies.",
+        "description": "Unavailable: real backend compliance validation is not implemented.",
         "inputSchema": {
             "type": "object",
             "properties": {
-                "icao": {"type": "string", "description": "ICAO airport code (e.g. KSFO, EGLL, EDDF, OMDB)"},
-                "validation_level": {
-                    "type": "string",
-                    "description": "Verification level: standard, strict, or geometric_only",
-                    "enum": ["standard", "strict", "geometric_only"],
-                },
+                "icao": {"type": "string"},
+                "validation_level": {"type": "string", "enum": ["standard", "strict", "geometric_only"]},
             },
             "required": ["icao"],
         },
     },
     {
         "name": "do272_spatial_sql",
-        "description": "Execute spatial PostGIS SQL query against aerodrome tables (do272_runway_elements, do272_guidance_lines, do272_vertical_structures).",
+        "description": "Unavailable: SQL execution is not implemented.",
         "inputSchema": {
             "type": "object",
-            "properties": {
-                "sql": {"type": "string", "description": "SQL query string"},
-            },
+            "properties": {"sql": {"type": "string"}},
             "required": ["sql"],
         },
     },
 ]
 
 
-def handle_tool_call(tool_name: str, arguments: Dict[str, Any]) -> Dict[str, Any]:
-    if tool_name == "do272_validate_compliance":
-        icao = arguments.get("icao", "KSFO").upper()
-        level = arguments.get("validation_level", "standard")
-        return {
-            "status": "success",
-            "icao": icao,
-            "validation_level": level,
-            "compliance_score": "96%",
-            "audit_status": "COMPLIANT",
-            "checks_summary": {
-                "total_checks": 28,
-                "passed": 26,
-                "warnings": 2,
-                "critical_violations": 0,
-            },
-            "inconsistencies": [
-                {
-                    "rule_id": "DO272-GEOM-002",
-                    "category": "Geometry",
-                    "feature_id": f"{icao}-TWY-F",
-                    "severity": "WARNING",
-                    "description": "Polygon boundary contains duplicate consecutive vertex.",
-                    "recommended_fix": "Clean redundant collinear vertices.",
-                },
-                {
-                    "rule_id": "DO272-NET-002",
-                    "category": "Network",
-                    "feature_id": f"{icao}-STAND-A1",
-                    "severity": "WARNING",
-                    "description": "Parking stand lead-in distance is 85m from nearest TGL segment.",
-                    "recommended_fix": "Extend StandGuidanceLine to ensure connectivity within 60m.",
-                },
-            ],
-            "rules_evaluated": [
-                "DO272-GEOM-001: Polygon Coordinate Boundary Closure & Vertex Integrity",
-                "DO272-ATTR-001: ICAO Annex 14 / DO-272 Pavement Classification (PCN) Syntax",
-                "DO272-NET-001: Runway Holding Position Safety Setback Envelope (40m - 120m)",
-                "DO272-SAFE-001: Runway Safety Area (RSA) Frangibility & Obstruction Rules",
-            ],
-        }
+class ToolError(Exception):
+    """An error that can be reported to an MCP client."""
 
-    elif tool_name == "do272_query_features":
-        icao = arguments.get("icao", "KSFO").upper()
-        fclass = arguments.get("feature_class", "all")
-        return {
-            "status": "success",
-            "icao": icao,
-            "feature_class": fclass,
-            "count": 14,
-            "sample_features": [
-                {"id": f"{icao}-RWY-28L", "class": "RunwayElement", "length_m": 3469, "surface": "Asphalt"},
-                {"id": f"{icao}-TWY-F", "class": "TaxiwayElement", "designator": "Foxtrot", "width_m": 30},
-                {"id": f"{icao}-STAND-A6", "class": "ParkingStandArea", "gate": "A6", "max_aircraft": "A380"},
-            ],
-        }
 
-    elif tool_name == "do272_find_taxi_route":
-        origin = arguments.get("origin", "Exit 28L")
-        destination = arguments.get("destination", "Gate A6")
-        return {
-            "status": "success",
-            "origin": origin,
-            "destination": destination,
-            "total_distance_meters": 1420,
-            "estimated_taxi_minutes": 3.1,
-            "route_instructions": [
-                f"Depart {origin}",
-                "Follow Taxiway F northbound",
-                "Hold short Runway 28R at CAT III hold line",
-                "Cross Runway 28R upon ATC clearance",
-                "Turn left onto Taxiway Alpha",
-                f"Turn into {destination} via Stand Guidance Line",
-            ],
-            "safety_alerts": ["Caution: Crosses HS-2 (Runway incursion hotspot)"],
-        }
+def handle_tool_call(tool_name: str, arguments: dict[str, Any]) -> dict[str, Any]:
+    if tool_name != "do272_query_features":
+        raise ToolError(f"{tool_name} is unavailable: a real backend implementation is not available.")
 
-    elif tool_name == "do272_obstacle_clearance_check":
-        icao = arguments.get("icao", "KSFO").upper()
-        return {
-            "status": "success",
-            "icao": icao,
-            "evaluated_count": 3,
-            "findings": [
-                {
-                    "structure": "SFO Air Traffic Control Tower",
-                    "height_agl": 67.4,
-                    "elevation_amsl": 71.4,
-                    "surface": "Inner Horizontal (45m limit)",
-                    "breached": True,
-                    "penetration_meters": 22.4,
-                    "mitigation": "Shielded by aerodrome obstruction evaluation, marked with high-intensity dual strobes",
-                },
-                {
-                    "structure": "Superbay Maintenance Hangar",
-                    "height_agl": 42.0,
-                    "elevation_amsl": 46.0,
-                    "surface": "Transitional Surface (1:7)",
-                    "breached": False,
-                    "clearance_margin_meters": 3.8,
-                },
-            ],
-        }
+    icao = arguments.get("icao")
+    if not isinstance(icao, str) or not re.fullmatch(r"[A-Z]{4}", icao.strip().upper()):
+        raise ToolError("Enter a four-letter ICAO airport code.")
+    icao = icao.strip().upper()
+    feature_class = arguments.get("feature_class", "all")
+    if not isinstance(feature_class, str) or not feature_class.strip():
+        raise ToolError("feature_class must be a non-empty string.")
+    feature_class = feature_class.strip()
 
-    elif tool_name == "do272_spatial_sql":
-        sql = arguments.get("sql", "")
-        return {
-            "status": "success",
-            "query": sql,
-            "rows": [
-                {"designator": "28L/10R", "length_m": 3469, "surface": "Asphalt", "pcn": "105/R/B/W/T"},
-                {"designator": "28R/10L", "length_m": 3618, "surface": "Concrete", "pcn": "112/R/B/W/T"},
-            ],
-        }
+    base_url = os.environ.get("DO272_API_URL", "http://127.0.0.1:8000").rstrip("/")
+    try:
+        with urlopen(f"{base_url}/api/v1/aerodromes/{icao}", timeout=10) as response:
+            dataset = json.load(response)
+    except HTTPError as error:
+        if error.code == 404:
+            raise ToolError(f"Aerodrome {icao} was not found in the active database.") from error
+        raise ToolError(f"Backend API returned HTTP {error.code} for {icao}.") from error
+    except (URLError, TimeoutError, OSError, ValueError) as error:
+        raise ToolError(f"Could not read aerodrome {icao} from the backend API: {error}") from error
 
-    return {"error": f"Unknown tool: {tool_name}"}
+    if (
+        not isinstance(dataset, dict)
+        or dataset.get("icao") != icao
+        or not isinstance(dataset.get("source"), str)
+        or not isinstance(dataset.get("features"), list)
+        or any(not isinstance(feature, dict) for feature in dataset["features"])
+    ):
+        raise ToolError(f"Backend API returned an invalid dataset for {icao}.")
+
+    baseline_available = dataset["source"] != "OpenStreetMap Aeroway Ingest"
+    features = dataset["features"] if baseline_available else []
+    if feature_class != "all":
+        features = [feature for feature in features if feature.get("featureClass") == feature_class]
+    return {
+        "status": "success",
+        "icao": icao,
+        "feature_class": feature_class,
+        "source": dataset["source"],
+        "baseline_available": baseline_available,
+        "count": len(features),
+        "features": features,
+    }
 
 
 async def run_stdio_mcp():
-    """
-    Standard JSON-RPC 2.0 stdio loop for Model Context Protocol
-    """
-    sys.stderr.write("DO-272 MCP Server initialized on stdio transport.\n")
+    sys.stderr.write("DO-272 MCP server started; feature queries require the backend API.\n")
     sys.stderr.flush()
+    tool_names = {tool["name"] for tool in DO272_TOOLS}
 
     while True:
         line = await asyncio.get_event_loop().run_in_executor(None, sys.stdin.readline)
         if not line:
             break
+        msg_id = None
         try:
             req = json.loads(line)
-            method = req.get("method")
+            if not isinstance(req, dict):
+                raise ValueError("Request must be an object")
             msg_id = req.get("id")
-
+            method = req.get("method")
+            if "id" not in req:
+                continue
             if method == "tools/list":
                 resp = {"jsonrpc": "2.0", "id": msg_id, "result": {"tools": DO272_TOOLS}}
             elif method == "tools/call":
                 params = req.get("params", {})
-                name = params.get("name")
+                if not isinstance(params, dict) or not isinstance(params.get("name"), str):
+                    raise ValueError("Tool name is required")
+                name = params["name"]
                 args = params.get("arguments", {})
-                result = handle_tool_call(name, args)
-                if "error" in result:
-                    resp = {
-                        "jsonrpc": "2.0",
-                        "id": msg_id,
-                        "error": {"code": -32601, "message": result["error"]},
-                    }
+                if not isinstance(args, dict):
+                    raise ValueError("Tool arguments must be an object")
+                if name not in tool_names:
+                    resp = {"jsonrpc": "2.0", "id": msg_id,
+                            "error": {"code": -32601, "message": f"Unknown tool: {name}"}}
                 else:
-                    resp = {
-                        "jsonrpc": "2.0",
-                        "id": msg_id,
-                        "result": {"content": [{"type": "text", "text": json.dumps(result, indent=2)}]},
-                    }
+                    try:
+                        result = handle_tool_call(name, args)
+                        content = json.dumps(result, indent=2)
+                        resp = {"jsonrpc": "2.0", "id": msg_id,
+                                "result": {"content": [{"type": "text", "text": content}]}}
+                    except ToolError as error:
+                        resp = {"jsonrpc": "2.0", "id": msg_id,
+                                "result": {"isError": True,
+                                           "content": [{"type": "text", "text": str(error)}]}}
             elif method == "initialize":
                 resp = {
-                    "jsonrpc": "2.0",
-                    "id": msg_id,
+                    "jsonrpc": "2.0", "id": msg_id,
                     "result": {
                         "protocolVersion": "2024-11-05",
                         "capabilities": {"tools": {}},
@@ -253,13 +179,20 @@ async def run_stdio_mcp():
                     },
                 }
             else:
-                resp = {"jsonrpc": "2.0", "id": msg_id, "result": {}}
-
-            sys.stdout.write(json.dumps(resp) + "\n")
-            sys.stdout.flush()
-        except Exception as err:
-            sys.stderr.write(f"Error handling MCP message: {err}\n")
+                resp = {"jsonrpc": "2.0", "id": msg_id,
+                        "error": {"code": -32601, "message": f"Unknown method: {method}"}}
+        except json.JSONDecodeError:
+            resp = {"jsonrpc": "2.0", "id": None, "error": {"code": -32700, "message": "Parse error"}}
+        except ValueError as error:
+            resp = {"jsonrpc": "2.0", "id": msg_id, "error": {"code": -32602, "message": str(error)}}
+        except Exception as error:
+            sys.stderr.write(f"Error handling MCP message: {error}\n")
             sys.stderr.flush()
+            resp = {"jsonrpc": "2.0", "id": msg_id,
+                    "error": {"code": -32603, "message": "Internal server error"}}
+
+        sys.stdout.write(json.dumps(resp) + "\n")
+        sys.stdout.flush()
 
 
 if __name__ == "__main__":

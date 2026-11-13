@@ -94,6 +94,23 @@ class SourceSnapshotModel(Base):
     payload = Column(JSON, nullable=False)
 
 
+class SnapshotFeatureModel(Base):
+    __tablename__ = "do272_snapshot_features"
+
+    snapshot_id = Column(Integer, ForeignKey("do272_source_snapshots.id", ondelete="CASCADE"), primary_key=True)
+    feature_index = Column(Integer, primary_key=True)
+    feature_id = Column(String(150), nullable=False)
+    feature_class = Column(String(100), nullable=True)
+    payload = Column(JSON, nullable=False)
+
+
+class ActiveCuratedSnapshotModel(Base):
+    __tablename__ = "do272_active_curated_snapshots"
+
+    aerodrome_id = Column(String(10), primary_key=True)
+    snapshot_id = Column(Integer, ForeignKey("do272_source_snapshots.id"), nullable=False)
+
+
 def sanitize_legacy_osm(dataset: dict[str, Any]) -> dict[str, Any]:
     """Keep legacy OSM data while removing attributes invented by the old importer."""
     result = deepcopy(dataset)
@@ -133,7 +150,18 @@ def add_source_snapshot(session, icao: str, kind: str, payload: dict[str, Any],
     )
     session.add(snapshot)
     session.flush()
+    add_snapshot_features(session, snapshot)
     return snapshot
+
+
+def add_snapshot_features(session, snapshot: SourceSnapshotModel) -> None:
+    for index, feature in enumerate(snapshot.payload["dataset"].get("features", [])):
+        session.add(SnapshotFeatureModel(
+            snapshot_id=snapshot.id, feature_index=index,
+            feature_id=str(feature["id"]),
+            feature_class=feature.get("featureClass") or feature.get("aeroway"),
+            payload=feature,
+        ))
 
 
 def snapshot_payload(snapshot: SourceSnapshotModel) -> dict[str, Any]:
@@ -322,6 +350,12 @@ def initialize_database(engine_name: DatabaseEngine | None = None) -> None:
                     )
                 if icao in seed_datasets and latest_snapshot(session, icao, "curated") is None:
                     add_source_snapshot(session, icao, "curated", {"dataset": seed_datasets[icao]})
+        session.flush()
+        indexed_ids = {row[0] for row in session.query(SnapshotFeatureModel.snapshot_id).distinct()}
+        for snapshot in session.query(SourceSnapshotModel).all():
+            if snapshot.id not in indexed_ids:
+                # Legacy payloads may use the older feature representation; retain it unchanged.
+                add_snapshot_features(session, snapshot)
         session.commit()
     finally:
         session.close()

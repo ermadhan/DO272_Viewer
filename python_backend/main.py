@@ -1,6 +1,7 @@
 """DO-272 aerodrome API backed by SQLite or PostgreSQL."""
 
 import math
+import re
 from contextlib import asynccontextmanager
 from datetime import datetime, timezone
 from typing import Any, AsyncGenerator, Literal
@@ -16,17 +17,22 @@ import uvicorn
 from database import (
     AerodromeFeatureModel,
     AerodromeModel,
+    ActiveCuratedSnapshotModel,
     SourceSnapshotModel,
     activate_engine,
     add_source_snapshot,
     create_session,
     get_active_engine_name,
+    get_engine,
     initialize_database,
     latest_snapshot,
     serialize_dataset,
     snapshot_payload,
     upsert_dataset,
 )
+from faa_nasr import FeedError, fetch_airport
+from nats_aip import fetch_airport as fetch_nats_airport
+from ourairports import fetch_airport as fetch_ourairports_airport
 
 
 @asynccontextmanager
@@ -69,6 +75,15 @@ class EngineToggleRequest(BaseModel):
     engine: str
 
 
+class OsmMemberPayload(BaseModel):
+    type: Literal["node", "way", "relation"]
+    ref: int = Field(gt=0)
+    role: str
+    geometry: list[dict[str, float]] | None = None
+    lat: float | None = None
+    lon: float | None = None
+
+
 class OsmFeaturePayload(BaseModel):
     id: str
     osmType: Literal["node", "way", "relation"]
@@ -77,9 +92,10 @@ class OsmFeaturePayload(BaseModel):
     timestamp: str | None
     aeroway: str
     designator: str
-    geometryType: Literal["Point", "LineString", "Polygon"]
-    coordinates: tuple[float, float] | list[tuple[float, float]]
+    geometryType: Literal["Point", "LineString", "Polygon", "GeometryCollection"]
+    coordinates: tuple[float, float] | list[tuple[float, float]] | list[list[tuple[float, float]]]
     tags: dict[str, str]
+    members: list[OsmMemberPayload] | None = None
 
     @model_validator(mode="after")
     def validate_geometry(self):
@@ -87,14 +103,26 @@ class OsmFeaturePayload(BaseModel):
             raise ValueError("OSM feature ID does not match object type and ID")
         if (self.osmType == "node") != (self.geometryType == "Point"):
             raise ValueError("OSM node and geometry types do not match")
+        if (self.osmType == "relation") != (self.geometryType == "GeometryCollection"):
+            raise ValueError("OSM relation and geometry types do not match")
         if self.geometryType == "Point":
             if not isinstance(self.coordinates, tuple):
                 raise ValueError("Point geometry must have one coordinate")
             points = [self.coordinates]
+        elif self.geometryType == "GeometryCollection":
+            if self.members is None or not isinstance(self.coordinates, list):
+                raise ValueError("Relation must contain its members and geometry collection")
+            points = []
+            for part in self.coordinates:
+                if not isinstance(part, list) or not part:
+                    raise ValueError("Relation geometry parts must contain coordinates")
+                points.extend(part)
         else:
             if not isinstance(self.coordinates, list):
                 raise ValueError("Line and polygon geometries must have coordinate lists")
             points = self.coordinates
+            if any(not isinstance(point, tuple) for point in points):
+                raise ValueError("Line and polygon coordinates must be points")
             minimum = 4 if self.geometryType == "Polygon" else 2
             if len(points) < minimum:
                 raise ValueError("Geometry has too few coordinates")
@@ -110,6 +138,7 @@ class OsmSnapshotPayload(BaseModel):
     dataset: AerodromeDatasetPayload
     osmTimestamp: str | None = None
     attribution: str
+    boundary: dict[str, Any] | None = None
 
     @model_validator(mode="after")
     def validate_features(self):
@@ -206,7 +235,10 @@ def list_aerodromes(db: Session = Depends(get_db)):
     for row in result:
         aerodrome = db.get(AerodromeModel, row["icao"])
         if aerodrome.source == "OpenStreetMap Aeroway Ingest":
-            curated = latest_snapshot(db, row["icao"], "curated")
+            curated = db.query(SourceSnapshotModel).filter_by(
+                aerodrome_id=row["icao"], source_kind="curated"
+            ).order_by(SourceSnapshotModel.id.desc()).all()
+            curated = next((item for item in curated if not item.payload.get("provider")), None)
             if curated:
                 dataset = curated.payload["dataset"]
                 row.update({key: dataset.get(key, "") for key in ("iata", "name", "city", "country")})
@@ -223,12 +255,25 @@ def list_aerodromes(db: Session = Depends(get_db)):
                 "city": dataset.get("city") or "", "country": dataset.get("country") or "",
                 "featureCount": 0,
             })
+    for active in db.query(ActiveCuratedSnapshotModel).all():
+        snapshot = db.get(SourceSnapshotModel, active.snapshot_id)
+        dataset = snapshot.payload["dataset"]
+        summary = {
+            "icao": active.aerodrome_id, "iata": dataset.get("iata") or "",
+            "name": dataset["name"], "city": dataset.get("city") or "",
+            "country": dataset.get("country") or "", "featureCount": len(dataset["features"]),
+        }
+        result = [row for row in result if row["icao"] != active.aerodrome_id]
+        result.append(summary)
     return sorted(result, key=lambda row: row["icao"])
 
 
 @app.get("/api/v1/aerodromes/{icao}")
 def get_aerodrome(icao: str, db: Session = Depends(get_db)):
     icao = icao.strip().upper()
+    active = db.get(ActiveCuratedSnapshotModel, icao)
+    if active:
+        return db.get(SourceSnapshotModel, active.snapshot_id).payload["dataset"]
     aerodrome = (
         db.query(AerodromeModel)
         .options(selectinload(AerodromeModel.feature_rows))
@@ -237,13 +282,126 @@ def get_aerodrome(icao: str, db: Session = Depends(get_db)):
     )
     if aerodrome is not None and aerodrome.source != "OpenStreetMap Aeroway Ingest":
         return serialize_dataset(aerodrome)
-    curated = latest_snapshot(db, icao, "curated")
+    curated = db.query(SourceSnapshotModel).filter_by(
+        aerodrome_id=icao, source_kind="curated"
+    ).order_by(SourceSnapshotModel.id.desc()).all()
+    curated = next((item for item in curated if not item.payload.get("provider")), None)
     if curated:
         return curated.payload["dataset"]
     osm = latest_snapshot(db, icao, "osm")
     if osm:
         return {**snapshot_payload(osm)["dataset"], "features": []}
     raise HTTPException(status_code=404, detail=f"Aerodrome {icao} was not found")
+
+
+@app.post("/api/v1/aerodromes/{icao}/curated-import")
+def import_curated(icao: str, provider: Literal["faa", "nats", "ourairports"] = "faa", db: Session = Depends(get_db)):
+    icao = icao.strip().upper()
+    if not re.fullmatch(r"[A-Z]{4}", icao):
+        raise HTTPException(status_code=422, detail="Enter a four-letter ICAO airport code")
+    try:
+        providers = {"faa": fetch_airport, "nats": fetch_nats_airport, "ourairports": fetch_ourairports_airport}
+        payload = providers[provider](icao)
+    except FeedError as error:
+        raise HTTPException(status_code=503, detail=str(error)) from error
+    try:
+        baseline = get_aerodrome(icao, db)
+    except HTTPException as error:
+        if error.status_code != 404:
+            raise
+        baseline = None
+    def class_counts(dataset):
+        counts = {}
+        for feature in dataset["features"]:
+            feature_class = feature["featureClass"]
+            counts[feature_class] = counts.get(feature_class, 0) + 1
+        return counts
+    def runway_key(feature):
+        return "/".join(sorted(str(feature.get("designator", "")).upper().replace(" ", "").split("/")))
+    runway_comparisons = []
+    if baseline:
+        for feature in payload["dataset"]["features"]:
+            if feature.get("featureClass") != "RunwayElement":
+                continue
+            matches = [item for item in baseline["features"]
+                       if item.get("featureClass") == "RunwayElement"
+                       and runway_key(item) == runway_key(feature)]
+            if len(matches) == 1:
+                runway_comparisons.append({
+                    "designator": feature["designator"],
+                    "baselineLength": matches[0].get("lengthMeters"),
+                    "importLength": feature.get("lengthMeters"),
+                    "baselineWidth": matches[0].get("widthMeters"),
+                    "importWidth": feature.get("widthMeters"),
+                })
+    payload["comparison"] = {
+        "baselineCounts": class_counts(baseline) if baseline else {},
+        "importCounts": class_counts(payload["dataset"]),
+        "baselineAvailable": baseline is not None and baseline["source"] != "OpenStreetMap Aeroway Ingest",
+        "runways": runway_comparisons,
+    }
+    captured_at = datetime.now(timezone.utc).isoformat()
+    snapshot = add_source_snapshot(db, icao, "curated", payload, captured_at)
+    db.commit()
+    return {"id": snapshot.id, "capturedAt": captured_at, **payload}
+
+
+@app.get("/api/v1/aerodromes/{icao}/curated-snapshots")
+def list_curated_snapshots(icao: str, db: Session = Depends(get_db)):
+    icao = icao.strip().upper()
+    active = db.get(ActiveCuratedSnapshotModel, icao)
+    snapshots = db.query(SourceSnapshotModel).filter_by(
+        aerodrome_id=icao, source_kind="curated"
+    ).order_by(SourceSnapshotModel.id.desc()).all()
+    return [
+        {"id": row.id, "capturedAt": row.captured_at,
+         "provider": row.payload.get("provider", "Legacy curated seed"),
+         "effectiveDate": row.payload.get("effectiveDate"),
+         "featureCount": len(row.payload["dataset"]["features"]),
+         "active": active is not None and active.snapshot_id == row.id}
+        for row in snapshots
+    ]
+
+
+@app.get("/api/v1/aerodromes/{icao}/curated-snapshots/{snapshot_id}")
+def get_curated_snapshot(icao: str, snapshot_id: int, db: Session = Depends(get_db)):
+    snapshot = db.query(SourceSnapshotModel).filter_by(
+        id=snapshot_id, aerodrome_id=icao.strip().upper(), source_kind="curated"
+    ).one_or_none()
+    if snapshot is None:
+        raise HTTPException(status_code=404, detail="Curated snapshot was not found")
+    return {"id": snapshot.id, "capturedAt": snapshot.captured_at, **snapshot.payload}
+
+
+@app.post("/api/v1/aerodromes/{icao}/curated-snapshots/{snapshot_id}/activate")
+def activate_curated_snapshot(icao: str, snapshot_id: int, db: Session = Depends(get_db)):
+    icao = icao.strip().upper()
+    snapshot = db.query(SourceSnapshotModel).filter_by(
+        id=snapshot_id, aerodrome_id=icao, source_kind="curated"
+    ).one_or_none()
+    if snapshot is None:
+        raise HTTPException(status_code=404, detail="Curated snapshot was not found")
+    active = db.get(ActiveCuratedSnapshotModel, icao)
+    if active is None:
+        active = ActiveCuratedSnapshotModel(aerodrome_id=icao, snapshot_id=snapshot.id)
+        db.add(active)
+    else:
+        active.snapshot_id = snapshot.id
+    db.commit()
+    return {"activeSnapshotId": snapshot.id}
+
+
+@app.delete("/api/v1/aerodromes/{icao}/active-curated-snapshot")
+def restore_baseline(icao: str, db: Session = Depends(get_db)):
+    icao = icao.strip().upper()
+    baseline = db.get(AerodromeModel, icao)
+    if baseline is None or baseline.source == "OpenStreetMap Aeroway Ingest":
+        raise HTTPException(status_code=409, detail="No original baseline exists for this airport")
+    active = db.get(ActiveCuratedSnapshotModel, icao)
+    if active is not None:
+        db.delete(active)
+        db.commit()
+    return {"status": "original baseline restored"}
 
 
 @app.get("/api/v1/aerodromes/{icao}/osm-snapshots")
@@ -382,10 +540,13 @@ def evaluate_obstacles(req: ObstacleRequest):
 
 @app.get("/api/v1/database/engine")
 def get_database_engine():
+    engine = get_engine()
     return {
         "active_engine": get_active_engine_name(),
+        "database_location": engine.url.database,
         "supported_engines": ["sqlite", "postgres"],
-        "tables": ["do272_aerodromes", "do272_features", "do272_source_snapshots"],
+        "tables": ["do272_aerodromes", "do272_features", "do272_source_snapshots",
+                   "do272_snapshot_features", "do272_active_curated_snapshots"],
     }
 
 

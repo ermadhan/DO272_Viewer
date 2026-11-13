@@ -497,6 +497,7 @@ export function validateDO272Compliance(
   // Rule 1 & 2: Geometric Closure & Degeneracy for Polygons
   for (const feature of dataset.features) {
     if (
+      feature.geometryType !== 'LineString' &&
       ['RunwayElement', 'TaxiwayElement', 'ParkingStandArea', 'HotSpot', 'RunwaySafetyArea'].includes(
         feature.featureClass
       )

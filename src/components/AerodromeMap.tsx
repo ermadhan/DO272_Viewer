@@ -157,12 +157,14 @@ export const AerodromeMap: React.FC<AerodromeMapProps> = ({
           const latLngs = (feat.coordinates as [number, number][]).map(([lat, lng]) =>
             L.latLng(lat, lng)
           );
-          const polygon = L.polygon(latLngs, {
+          const options = {
             color: isSelected ? '#38BDF8' : isHighlighted ? '#F43F5E' : '#FFFFFF',
             weight: isSelected || isHighlighted ? 3 : 1.5,
             fillColor: feat.featureClass === 'RunwayShoulder' ? '#334155' : '#1F2937',
             fillOpacity: 0.9,
-          });
+          };
+          const polygon = feat.geometryType === 'LineString'
+            ? L.polyline(latLngs, options) : L.polygon(latLngs, options);
 
           polygon.bindTooltip(
             `<div class="font-mono text-xs font-bold text-white bg-slate-900 px-2 py-1 rounded border border-slate-700">
@@ -535,11 +537,16 @@ export const AerodromeMap: React.FC<AerodromeMapProps> = ({
     if (!group) return;
     group.clearLayers();
     supplementalFeatures.forEach(feature => {
-      let layer: L.Path;
+      let layer: L.Path | L.FeatureGroup;
       if (feature.geometryType === 'Point') {
         layer = L.circleMarker(feature.coordinates as [number, number], {
           radius: 5, color: '#f472b6', fillOpacity: 0.6,
         });
+      } else if (feature.geometryType === 'GeometryCollection') {
+        layer = L.featureGroup((feature.coordinates as [number, number][][]).map(points =>
+          points.length === 1
+            ? L.circleMarker(points[0], { radius: 5, color: '#f472b6' })
+            : L.polyline(points, { color: '#f472b6', weight: 2, dashArray: '5, 4' })));
       } else {
         const points = feature.coordinates as [number, number][];
         layer = feature.geometryType === 'Polygon'

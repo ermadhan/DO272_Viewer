@@ -1,6 +1,6 @@
 # RTCA DO-272 / EUROCAE ED-99 Aerodrome Spatial GIS & Model Context Protocol (MCP) Platform
 
-A standards-compliant aeronautical GIS visualization, spatial engineering, and Model Context Protocol (MCP) intelligence platform conforming to **RTCA DO-272 / EUROCAE ED-99** (Aeronautical Information Conceptual Model - AMDB) and **FAA AC 150/5300-18B / ICAO Annex 14** specifications.
+An experimental aeronautical GIS visualization, spatial analysis, and Model Context Protocol (MCP) platform inspired by **RTCA DO-272 / EUROCAE ED-99**. Its data and analyses are not verified for operational use or standards compliance.
 
 ---
 
@@ -24,8 +24,8 @@ A standards-compliant aeronautical GIS visualization, spatial engineering, and M
 * **Automated DO-272 Data Quality Requirement (DQR) Audits**: Geometry closure checks, duplicate vertex filtering, 5-part ICAO PCN syntax validation, hold-line setback verification, and stand connectivity scoring.
 * **Dijkstra Ground Taxiway Routing**: Graph pathfinding over connected `TaxiwayGuidanceLine` networks with turn-by-turn ATC taxi clearances and hot spot crossing alerts.
 * **3D FAA Part 77 Obstacle Clearance Evaluation**: Evaluates vertical structures against 1:50 approach and 1:7 transitional clearance surfaces with exact margin or penetration metrics.
-* **Persistent Airport Data**: Baseline airport records use `do272_aerodromes` and `do272_features`; source snapshots use `do272_source_snapshots`. PostgreSQL is optional.
-* **Worldwide Open Data Ingestion**: Live Overpass API ingestion querying and classifying real-world aerodromes from OpenStreetMap worldwide (e.g. KJFK, KLAX, EHAM, LFPG, RJTT, WSSS) or custom FAA 18B GeoJSON.
+* **Persistent Airport Data**: Original baselines and source-separated snapshots are stored in SQLite by default; PostgreSQL is optional.
+* **Airport Import**: Search OSM by ICAO and select a mapped boundary, or import a supported partial airport/runway feed for review.
 
 ---
 
@@ -33,11 +33,11 @@ A standards-compliant aeronautical GIS visualization, spatial engineering, and M
 
 | Aerodrome | ICAO / IATA | Geometry & Standard | Features Highlights |
 | :--- | :---: | :---: | :--- |
-| **San Francisco International** | `KSFO` / `SFO` | FAA NASR / DO-272 Curated | Intersecting 28L/10R & 01L/19R pairs, CAT III hold lines on TWY A/B, Concourses A/G stands, Safedock T1-24 lead-in lines, Control Tower (67.4m). |
-| **London Heathrow** | `EGLL` / `LHR` | Eurocontrol AMDB / ED-99 | Dual parallel 09L/27R & 09R/27L, PCN 120/R/B/W/T, Terminal 5 / Stand 501 lead-in system, Central Tower (87m). |
-| **Frankfurt Main** | `EDDF` / `FRA` | Eurocontrol AMDB / ED-99 | Dual parallel + Runway 18 West, dual-spine TWY November & Papa with mid/east connectors, Terminal 1 & 2 stands. |
-| **Dubai International** | `OMDB` / `DXB` | Curated DO-272 Hub | Dual parallel Code F A380 runways (12L/30R), Concourse A gates, Apron N to TWY Mike guidance spine, ASDE radar. |
-| **Worldwide Live Hubs** | *Any ICAO* | OpenStreetMap Overpass Ingest | Live Overpass API extraction around 4.5km bounding radius for any airport worldwide (KJFK, KLAX, EHAM, LFPG, etc.). |
+| **San Francisco International** | `KSFO` / `SFO` | Bundled seed, provenance unverified | Runways, taxiways, stands and other sample features. |
+| **London Heathrow** | `EGLL` / `LHR` | Bundled seed, provenance unverified | Runways, taxiways, stands and other sample features. |
+| **Frankfurt Main** | `EDDF` / `FRA` | Bundled seed, provenance unverified | Runways, taxiways, stands and other sample features. |
+| **Dubai International** | `OMDB` / `DXB` | Bundled seed, provenance unverified | Runways, taxiways, stands and other sample features. |
+| **Other airports** | *ICAO* | OSM or a supported import feed, where available | Source and feature coverage vary; see import limitations below. |
 
 ---
 
@@ -68,13 +68,27 @@ The standalone stdio MCP server is a separate process from this web data path.
 
 ### OpenStreetMap supplemental data
 
-OSM imports create dated, independently stored snapshots rather than replacing the airport baseline. The map shows unmatched and ambiguous OSM objects in pink by default; the snapshot selector can inspect earlier imports. Each object retains its OSM type, ID, tags, geometry, and available version and timestamp. Legacy imports have unknown capture times. OSM data is attributed to [OpenStreetMap contributors](https://www.openstreetmap.org/copyright); review the ODbL obligations before redistributing data.
+Use **Ingest Open Data** to enter a new or existing ICAO. For OSM, find and confirm an exact ICAO-tagged aerodrome and then import it. A mapped way or relation boundary is required; a node-only airport cannot currently be imported. The boundary query requests all aeroway-tagged nodes, ways and relations, but depends on OSM mapping and Overpass area availability and cannot guarantee complete airport coverage.
 
-Matching is a review aid, not a validation: named compatible features are compared spatially, with runway direction pairs normalized. Connected same-reference line segments are grouped if their endpoints are within 3 m and align within 30 degrees. A spatial match requires at least 95% of sampled OSM vertices and midpoints within 20 m of a baseline feature. Name-only candidates, multiple candidates and attribute disagreements require review; curated values are never overwritten. The importer queries a bounding box, so results may include unrelated nearby features. Geometry, coverage and thresholds are not authoritative.
+OSM imports create dated, independently stored snapshots rather than replacing the airport baseline. The map shows unmatched and ambiguous OSM objects in pink by default; the snapshot selector can inspect earlier imports. Each object retains its OSM type, ID, tags, geometry, and available version and timestamp. Relation members and roles are retained; relation member geometry is displayed as lines and points, not reconstructed filled multipolygons. Legacy imports have unknown capture times and used bounding boxes, which may include nearby airports. OSM data is attributed to [OpenStreetMap contributors](https://www.openstreetmap.org/copyright); review the ODbL obligations before redistributing data.
+
+Matching is a review aid, not a validation: named compatible features are compared spatially, with runway direction pairs normalized. Connected same-reference line segments are grouped if their endpoints are within 3 m and align within 30 degrees. A spatial match requires at least 95% of sampled OSM vertices and midpoints within 20 m of a baseline feature. Name-only candidates, multiple candidates and attribute disagreements require review; curated values are never overwritten. Geometry, coverage and thresholds are not authoritative.
 
 Missing OSM values remain unknown; no runway dimensions, pavement ratings, operational status or airport elevation are fabricated. OSM data is display/review-only and excluded from routing, safety analysis and MCP tools. OSM-only airports have no baseline available for those tools. Neither source has been established as operationally authoritative.
 
 The OSM inspector displays candidate classes for supported objects, including apron polygons and windsocks. Holding positions without a clear subtype remain unclassified. These mappings are not proof of DO-272 compliance.
+
+### Curated imports and storage
+
+The curated tab lets you select the current [FAA NASR airport CSV](https://www.faa.gov/air_traffic/flight_info/aeronav/aero_data/NASR_Subscription/) or [NATS UK AIP dataset](https://nats-uk.ead-it.com/cms-nats/opencms/en/Publications/digital-datasets/) for a new or existing ICAO code. FAA imports airport metadata and runway centerlines with two published endpoints (NAD 83). NATS imports current BASELINE airport metadata and runway lines between published thresholds, including displaced thresholds, with published nominal dimensions where available. These lines may not span the physical runway. Related raw airport, runway, direction and centreline-point records are retained in the snapshot; temporary changes and other AIP classes are not imported. Neither feed is a complete AMDB. NATS specifies aviation use only and not for resale; check its current dataset specification before use.
+
+The [OurAirports community dataset](https://github.com/davidmegginson/ourairports-data) can also be selected for airports worldwide, including Germany, India and the UAE, where records are available. It imports airport metadata and runway endpoint lines, not taxiways or a full airport map. It is community-maintained, not official AIP data, and its accuracy and currency have not been verified. The source files are public domain under the Unlicense; the snapshot records the capture time, source URLs, SHA-256 hashes and original matching CSV rows. No effective date is inferred.
+
+An official German DFS mapping import is not enabled: its published license document describes CC BY-NC 4.0 for airport mapping, while the EDDF GeoJSON contains an additional restriction on storage and reproduction. Official structured feeds and applicable terms for UAE and India have not been verified. OSM remains a separate supplemental source where available. The previously bundled curated seeds have unverified provenance.
+
+Imports are saved for review, with a class-count comparison and source date. They do not become active until **Activate reviewed snapshot** is selected. Activating a partial snapshot replaces the displayed baseline, not just matching features; the original baseline and prior snapshots remain stored. Select **Restore original baseline** where one exists, or select a previously saved snapshot to activate it. Missing elevation, transition altitude, runway dimensions and operational status are not invented.
+
+The modal displays the active database location (for PostgreSQL, the database name). Original baseline metadata and features are stored in `do272_aerodromes` and `do272_features`. Both curated and OSM imports are stored in `do272_source_snapshots`; their individual features are also indexed in `do272_snapshot_features`. `do272_active_curated_snapshots` records the reviewed active selection. Existing snapshot payloads remain intact during migration. The application reads snapshot datasets from the database, not directly from the feed after import.
 
 ---
 

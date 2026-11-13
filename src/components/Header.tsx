@@ -29,7 +29,7 @@ export const Header: React.FC<HeaderProps> = ({
   onOpenCatalogue,
 }) => {
   return (
-    <header className="flex items-center justify-between gap-8 px-6 py-3.5 bg-slate-950 border-b border-slate-800 text-slate-100 select-none">
+    <header className="flex items-center justify-between gap-8 overflow-x-auto px-6 py-3.5 bg-slate-950 border-b border-slate-800 text-slate-100 select-none">
       {/* Zone 1: Single text wordmark with subtle aeronautical glyph & Engine Toggle */}
       <div className="flex items-center gap-3 shrink-0">
         <div className="w-8 h-8 rounded-lg bg-sky-950 border border-sky-800 flex items-center justify-center text-sky-400">

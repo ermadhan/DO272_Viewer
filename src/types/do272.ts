@@ -73,7 +73,7 @@ export type SurfaceMaterial =
 
 export type ICAOCodeLetter = 'A' | 'B' | 'C' | 'D' | 'E' | 'F';
 
-export type OperationalStatus = 'Active' | 'Closed' | 'Under Maintenance' | 'Restricted';
+export type OperationalStatus = 'Active' | 'Closed' | 'Under Maintenance' | 'Restricted' | 'Unknown';
 
 export type HoldingCategory = 'CAT I' | 'CAT II' | 'CAT III' | 'Pattern' | 'Tactical';
 
@@ -83,6 +83,7 @@ export interface BaseDO272Feature {
   featureClass: DO272FeatureClass;
   designator: string; // e.g. "28R", "Alpha", "Gate A1", "HS-1"
   status: OperationalStatus;
+  geometryType?: 'Point' | 'LineString' | 'Polygon';
   elevationMeters?: number;
   properties?: Record<string, string | number | boolean | undefined>;
 }
@@ -223,7 +224,7 @@ export interface AerodromeDataset {
   elevationMeters: number | null;
   magneticVariation: string;
   transitionAltitudeFt: number | null;
-  source: 'Curated Hub (DO-272/ED-99)' | 'US FAA Airport GIS 18B' | 'OpenStreetMap Aeroway Ingest';
+  source: 'Curated Hub (DO-272/ED-99)' | 'US FAA Airport GIS 18B' | 'OpenStreetMap Aeroway Ingest' | 'FAA NASR (partial)' | 'NATS UK AIP (partial)' | 'OurAirports community (partial)';
   features: AnyDO272Feature[];
 }
 
@@ -235,15 +236,24 @@ export interface OsmFeature {
   timestamp: string | null;
   aeroway: string;
   designator: string;
-  geometryType: 'Point' | 'LineString' | 'Polygon';
-  coordinates: [number, number] | [number, number][];
+  geometryType: 'Point' | 'LineString' | 'Polygon' | 'GeometryCollection';
+  coordinates: [number, number] | [number, number][] | [number, number][][];
   tags: Record<string, string>;
+  members?: {
+    type: 'node' | 'way' | 'relation';
+    ref: number;
+    role: string;
+    geometry?: { lat: number; lon: number }[];
+    lat?: number;
+    lon?: number;
+  }[];
 }
 
 export interface OsmSnapshotInput {
   dataset: Omit<AerodromeDataset, 'features'> & { features: OsmFeature[] };
   osmTimestamp: string | null;
   attribution: string;
+  boundary?: { osmType: 'way' | 'relation'; osmId: number };
 }
 
 export interface OsmSnapshot extends OsmSnapshotInput {

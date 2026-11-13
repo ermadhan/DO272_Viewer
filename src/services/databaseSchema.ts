@@ -126,6 +126,49 @@ CREATE INDEX IF NOT EXISTS ix_do272_source_snapshots_aerodrome_id ON do272_sourc
 );
 CREATE INDEX IF NOT EXISTS ix_do272_source_snapshots_aerodrome_id ON do272_source_snapshots(aerodrome_id);`,
   },
+  {
+    tableName: 'do272_snapshot_features',
+    featureClass: 'Features in source snapshots',
+    columns: [
+      { name: 'snapshot_id', typePostgres: 'INTEGER NOT NULL', typeSqlite: 'INTEGER NOT NULL', description: 'Parent source snapshot' },
+      { name: 'feature_index', typePostgres: 'INTEGER NOT NULL', typeSqlite: 'INTEGER NOT NULL', description: 'Feature order within snapshot' },
+      { name: 'feature_id', typePostgres: 'VARCHAR(150) NOT NULL', typeSqlite: 'TEXT NOT NULL', description: 'Source feature identifier' },
+      { name: 'feature_class', typePostgres: 'VARCHAR(100)', typeSqlite: 'TEXT', description: 'Feature class or OSM aeroway tag' },
+      { name: 'payload', typePostgres: 'JSON NOT NULL', typeSqlite: 'JSON NOT NULL', description: 'Source feature including original attributes and geometry' },
+    ],
+    postgresDDL: `CREATE TABLE IF NOT EXISTS do272_snapshot_features (
+  snapshot_id INTEGER NOT NULL REFERENCES do272_source_snapshots(id) ON DELETE CASCADE,
+  feature_index INTEGER NOT NULL,
+  feature_id VARCHAR(150) NOT NULL,
+  feature_class VARCHAR(100),
+  payload JSON NOT NULL,
+  PRIMARY KEY (snapshot_id, feature_index)
+);`,
+    sqliteDDL: `CREATE TABLE IF NOT EXISTS do272_snapshot_features (
+  snapshot_id INTEGER NOT NULL REFERENCES do272_source_snapshots(id) ON DELETE CASCADE,
+  feature_index INTEGER NOT NULL,
+  feature_id TEXT NOT NULL,
+  feature_class TEXT,
+  payload JSON NOT NULL,
+  PRIMARY KEY (snapshot_id, feature_index)
+);`,
+  },
+  {
+    tableName: 'do272_active_curated_snapshots',
+    featureClass: 'Active curated selection',
+    columns: [
+      { name: 'aerodrome_id', typePostgres: 'VARCHAR(10) PRIMARY KEY', typeSqlite: 'TEXT PRIMARY KEY', description: 'Airport identifier' },
+      { name: 'snapshot_id', typePostgres: 'INTEGER NOT NULL', typeSqlite: 'INTEGER NOT NULL', description: 'Reviewed active snapshot' },
+    ],
+    postgresDDL: `CREATE TABLE IF NOT EXISTS do272_active_curated_snapshots (
+  aerodrome_id VARCHAR(10) PRIMARY KEY,
+  snapshot_id INTEGER NOT NULL REFERENCES do272_source_snapshots(id)
+);`,
+    sqliteDDL: `CREATE TABLE IF NOT EXISTS do272_active_curated_snapshots (
+  aerodrome_id TEXT PRIMARY KEY,
+  snapshot_id INTEGER NOT NULL REFERENCES do272_source_snapshots(id)
+);`,
+  },
 ];
 
 export function generateFullDdlScript(engine: DatabaseEngine): string {

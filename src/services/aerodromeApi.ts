@@ -12,6 +12,7 @@ export interface AerodromeSummary {
 
 interface DatabaseEngineResponse {
   active_engine: DatabaseEngine;
+  database_location: string | null;
 }
 
 export interface OsmSnapshotSummary {
@@ -21,6 +22,40 @@ export interface OsmSnapshotSummary {
   attribution: string;
   legacy: boolean;
   featureCount: number;
+}
+
+export interface CuratedSnapshot {
+  id: number;
+  capturedAt: string | null;
+  dataset: AerodromeDataset;
+  provider?: string;
+  sourceUrl?: string;
+  effectiveDate?: string;
+  coverage?: string;
+  attribution?: string;
+  license?: string;
+  skippedRunways?: string[];
+  comparison?: {
+    baselineAvailable: boolean;
+    baselineCounts: Record<string, number>;
+    importCounts: Record<string, number>;
+    runways?: {
+      designator: string;
+      baselineLength: number | null;
+      importLength: number | null;
+      baselineWidth: number | null;
+      importWidth: number | null;
+    }[];
+  };
+}
+
+export interface CuratedSnapshotSummary {
+  id: number;
+  capturedAt: string | null;
+  provider: string;
+  effectiveDate: string | null;
+  featureCount: number;
+  active: boolean;
 }
 
 const API_BASE_URL = (
@@ -46,9 +81,8 @@ export function getAerodromeDataset(icao: string): Promise<AerodromeDataset> {
   return requestJson(`/api/v1/aerodromes/${encodeURIComponent(icao)}`);
 }
 
-export async function getDatabaseEngine(): Promise<DatabaseEngine> {
-  const response = await requestJson<DatabaseEngineResponse>('/api/v1/database/engine');
-  return response.active_engine;
+export function getDatabaseInfo(): Promise<DatabaseEngineResponse> {
+  return requestJson('/api/v1/database/engine');
 }
 
 export async function setDatabaseEngine(engine: DatabaseEngine): Promise<DatabaseEngine> {
@@ -83,4 +117,24 @@ export function saveOsmSnapshot(snapshot: OsmSnapshotInput): Promise<OsmSnapshot
     method: 'POST', headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify(snapshot),
   });
+}
+
+export function importCurated(icao: string, provider: 'faa' | 'nats' | 'ourairports'): Promise<CuratedSnapshot> {
+  return requestJson(`/api/v1/aerodromes/${encodeURIComponent(icao)}/curated-import?provider=${provider}`, { method: 'POST' });
+}
+
+export function getCuratedSnapshots(icao: string): Promise<CuratedSnapshotSummary[]> {
+  return requestJson(`/api/v1/aerodromes/${encodeURIComponent(icao)}/curated-snapshots`);
+}
+
+export function getCuratedSnapshot(icao: string, id: number): Promise<CuratedSnapshot> {
+  return requestJson(`/api/v1/aerodromes/${encodeURIComponent(icao)}/curated-snapshots/${id}`);
+}
+
+export function activateCuratedSnapshot(icao: string, id: number): Promise<{ activeSnapshotId: number }> {
+  return requestJson(`/api/v1/aerodromes/${encodeURIComponent(icao)}/curated-snapshots/${id}/activate`, { method: 'POST' });
+}
+
+export function restoreOriginalBaseline(icao: string): Promise<{ status: string }> {
+  return requestJson(`/api/v1/aerodromes/${encodeURIComponent(icao)}/active-curated-snapshot`, { method: 'DELETE' });
 }

@@ -1,253 +1,184 @@
-import React, { useState } from 'react';
-import { X, Download, Globe, FileCode, CheckCircle, AlertCircle, Loader2 } from 'lucide-react';
-import { AerodromeDataset, OsmSnapshotInput } from '../types/do272';
-import { fetchOsmAerodrome } from '../data/aerodromes';
+import React, { useEffect, useState } from 'react';
+import { AlertCircle, Download, Loader2, X } from 'lucide-react';
+import { fetchOsmAerodrome, findOsmAirports, OsmAirportCandidate } from '../data/aerodromes';
+import { OsmSnapshotInput } from '../types/do272';
+import {
+  activateCuratedSnapshot, CuratedSnapshot, CuratedSnapshotSummary, getCuratedSnapshot,
+  getCuratedSnapshots, importCurated, restoreOriginalBaseline,
+} from '../services/aerodromeApi';
 
 interface DataIngestModalProps {
   isOpen: boolean;
   onClose: () => void;
-  onDatasetLoaded: (dataset: AerodromeDataset) => Promise<void>;
+  selectedIcao: string;
+  databaseEngine: 'sqlite' | 'postgres';
+  databaseLocation: string | null;
   onOsmLoaded: (snapshot: OsmSnapshotInput) => Promise<void>;
+  onCuratedActivated: (icao: string) => void;
 }
 
 export const DataIngestModal: React.FC<DataIngestModalProps> = ({
-  isOpen,
-  onClose,
-  onDatasetLoaded,
-  onOsmLoaded,
+  isOpen, onClose, selectedIcao, databaseEngine, databaseLocation, onOsmLoaded, onCuratedActivated,
 }) => {
-  const [activeIngestTab, setActiveIngestTab] = useState<'osm' | 'faa'>('osm');
-  const [searchIcao, setSearchIcao] = useState<string>('KJFK');
-  const [isLoading, setIsLoading] = useState<boolean>(false);
-  const [statusMessage, setStatusMessage] = useState<string | null>(null);
-  const [isError, setIsError] = useState<boolean>(false);
+  const [icao, setIcao] = useState(selectedIcao);
+  const [tab, setTab] = useState<'osm' | 'curated'>('curated');
+  const [provider, setProvider] = useState<'faa' | 'nats' | 'ourairports'>('faa');
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  const [preview, setPreview] = useState<CuratedSnapshot | null>(null);
+  const [history, setHistory] = useState<CuratedSnapshotSummary[]>([]);
+  const [candidates, setCandidates] = useState<OsmAirportCandidate[]>([]);
+  const [candidateIndex, setCandidateIndex] = useState('');
 
-  // FAA GeoJSON state
-  const [faaJsonInput, setFaaJsonInput] = useState<string>('');
+  useEffect(() => {
+    if (isOpen) {
+      setIcao(selectedIcao);
+      setPreview(null);
+      setHistory([]);
+      setError(null);
+      setCandidates([]);
+      setCandidateIndex('');
+    }
+  }, [isOpen, selectedIcao]);
 
   if (!isOpen) return null;
-
-  const handleFetchOsm = async () => {
-    if (!searchIcao.trim()) return;
-    setIsLoading(true);
-    setStatusMessage(`Connecting to OpenStreetMap Overpass API for ${searchIcao.toUpperCase()}...`);
-    setIsError(false);
-
-    try {
-      const snapshot = await fetchOsmAerodrome(searchIcao);
-      await onOsmLoaded(snapshot);
-      setStatusMessage(
-        `Saved ${snapshot.dataset.features.length} OSM features for ${snapshot.dataset.name} to the database.`
-      );
-      onClose();
-    } catch (err: unknown) {
-      setIsError(true);
-      const msg = err instanceof Error ? err.message : 'Unknown error during open data ingestion';
-      setStatusMessage(`Ingest Failed: ${msg}`);
-    } finally {
-      setIsLoading(false);
-    }
-  };
-
-  const handleImportFaaJson = async () => {
-    let newDataset: AerodromeDataset;
-    try {
-      const parsed = JSON.parse(faaJsonInput);
-      const features = parsed.features || [];
-      newDataset = {
-        icao: 'FAA-IMP',
-        iata: 'IMP',
-        name: parsed.name || 'FAA Airport GIS Imported',
-        city: 'Imported',
-        country: 'United States',
-        center: [37.6188, -122.375],
-        elevationMeters: 10,
-        magneticVariation: '0.0°',
-        transitionAltitudeFt: 18000,
-        source: 'US FAA Airport GIS 18B',
-        features: features.map((f: Record<string, unknown>, idx: number) => ({
-          id: `FAA-${idx}`,
-          aerodromeId: 'FAA-IMP',
-          featureClass: 'RunwayElement',
-          designator: `RWY-${idx}`,
-          status: 'Active',
-          lengthMeters: 3000,
-          widthMeters: 45,
-          trueHeading: 0,
-          surface: 'Asphalt',
-          pcnRating: '100/F/A/W/T',
-          coordinates: [
-            [37.61, -122.38],
-            [37.62, -122.37],
-          ],
-          properties: f.properties || {},
-        })),
-      };
-
-    } catch {
-      setIsError(true);
-      setStatusMessage('Invalid JSON format. Please ensure standard FAA GeoJSON.');
+  const code = icao.trim().toUpperCase();
+  const execute = async (action: () => Promise<void>) => {
+    if (!/^[A-Z]{4}$/.test(code)) {
+      setError('Enter a four-letter ICAO airport code.');
       return;
     }
-
-    setIsLoading(true);
+    setLoading(true);
+    setError(null);
     try {
-      await onDatasetLoaded(newDataset);
-      setStatusMessage(`Saved ${newDataset.features.length} imported features to the database.`);
-      onClose();
-    } catch (err: unknown) {
-      setIsError(true);
-      const msg = err instanceof Error ? err.message : 'Unknown error saving the imported dataset';
-      setStatusMessage(`Database save failed: ${msg}`);
+      await action();
+    } catch (reason: unknown) {
+      setError(reason instanceof Error ? reason.message : 'Import failed.');
     } finally {
-      setIsLoading(false);
+      setLoading(false);
     }
   };
+  const loadHistory = async () => setHistory(await getCuratedSnapshots(code));
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/75 backdrop-blur-sm p-4">
-      <div className="bg-slate-900 border border-slate-800 rounded-2xl w-full max-w-xl overflow-hidden flex flex-col shadow-2xl text-slate-100">
-        {/* Header */}
-        <div className="flex items-center justify-between p-5 border-b border-slate-800 shrink-0">
-          <div className="flex items-center gap-3">
-            <div className="w-9 h-9 rounded-xl bg-sky-950 border border-sky-800 flex items-center justify-center text-sky-400">
-              <Download className="w-5 h-5" />
-            </div>
-            <div>
-              <h2 className="text-base font-bold text-white font-mono">
-                Open Data Ingestion Pipeline
-              </h2>
-              <p className="text-xs text-slate-400">
-                Convert live OpenStreetMap Aeroways or FAA Airport GIS datasets into DO-272 standards.
-              </p>
-            </div>
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/75 p-4">
+      <div className="bg-slate-900 border border-slate-800 rounded-2xl w-full max-w-xl max-h-[90vh] overflow-auto text-slate-100">
+        <div className="flex items-center justify-between p-5 border-b border-slate-800">
+          <div>
+            <h2 className="text-base font-semibold">Add airport / import data</h2>
+            <p className="text-xs text-slate-400">Enter a new or existing airport ICAO code.</p>
           </div>
-          <button
-            onClick={onClose}
-            className="p-1.5 rounded-lg text-slate-400 hover:text-white hover:bg-slate-800 transition-colors"
-          >
-            <X className="w-5 h-5" />
-          </button>
+          <button onClick={onClose} aria-label="Close"><X className="w-5 h-5" /></button>
         </div>
-
-        {/* Tab Selection */}
-        <div className="flex border-b border-slate-800 bg-slate-950/60 px-5 pt-3 gap-4 text-xs font-mono">
-          <button
-            onClick={() => setActiveIngestTab('osm')}
-            className={`pb-2.5 transition-colors border-b-2 flex items-center gap-2 ${
-              activeIngestTab === 'osm'
-                ? 'border-sky-500 text-sky-400 font-bold'
-                : 'border-transparent text-slate-400 hover:text-slate-200'
-            }`}
-          >
-            <Globe className="w-4 h-4" />
-            Global OpenStreetMap Aeroway Ingest
-          </button>
-          <button
-            onClick={() => setActiveIngestTab('faa')}
-            className={`pb-2.5 transition-colors border-b-2 flex items-center gap-2 ${
-              activeIngestTab === 'faa'
-                ? 'border-sky-500 text-sky-400 font-bold'
-                : 'border-transparent text-slate-400 hover:text-slate-200'
-            }`}
-          >
-            <FileCode className="w-4 h-4" />
-            FAA Airport GIS 18B Importer
-          </button>
-        </div>
-
-        {/* Body */}
-        <div className="p-5 space-y-4 text-xs font-mono">
-          {activeIngestTab === 'osm' ? (
-            <div className="space-y-4">
-              <div>
-                <label className="text-[11px] text-slate-400 uppercase tracking-wider block mb-1.5">
-                  Enter Airport ICAO Code (Worldwide)
+        <div className="p-5 space-y-4 text-xs">
+          <p className="text-slate-400">Saving to {databaseEngine === 'sqlite' ? 'SQLite' : 'PostgreSQL'}: {databaseLocation || 'location unavailable'}</p>
+          <p className="text-slate-400">Original airport data is in do272_aerodromes and do272_features. Imported curated and OSM data is saved in do272_source_snapshots and do272_snapshot_features. A reviewed selection is recorded in do272_active_curated_snapshots.</p>
+          <label className="block text-slate-300">
+            Airport ICAO
+            <input value={icao} onChange={event => {
+              setIcao(event.target.value.toUpperCase()); setPreview(null); setHistory([]); setError(null);
+              setCandidates([]); setCandidateIndex('');
+            }} maxLength={4} className="mt-1 block w-full bg-slate-950 border border-slate-700 rounded p-2 text-sm" />
+          </label>
+          <div className="flex gap-2">
+            <button onClick={() => setTab('curated')} className={`px-3 py-2 rounded ${tab === 'curated' ? 'bg-sky-700' : 'bg-slate-800'}`}>Curated feed</button>
+            <button onClick={() => setTab('osm')} className={`px-3 py-2 rounded ${tab === 'osm' ? 'bg-sky-700' : 'bg-slate-800'}`}>OpenStreetMap</button>
+          </div>
+          {tab === 'curated' ? (
+            <div className="space-y-3">
+              <label className="block text-slate-300">Feed provider
+                <select value={provider} onChange={event => {
+                  setProvider(event.target.value as 'faa' | 'nats' | 'ourairports'); setPreview(null); setError(null);
+                }} className="block w-full mt-1 p-2 bg-slate-950 border border-slate-700 rounded">
+                  <option value="faa">United States — FAA NASR</option>
+                  <option value="nats">United Kingdom — NATS UK AIP</option>
+                  <option value="ourairports">Worldwide — OurAirports community</option>
+                </select>
+              </label>
+              <p className="text-slate-300">These feeds provide partial data, not a complete AMDB. Official Germany, UAE and India feeds are not available here.</p>
+              {provider === 'nats' && <p className="text-amber-300">NATS UK AIP: for aviation use only; not for resale. Runway lines connect published thresholds and may not span the physical runway. Verify the <a href="https://nats-uk.ead-it.com/cms-nats/opencms/en/Publications/digital-datasets/" target="_blank" rel="noreferrer" className="underline">dataset terms</a> before use.</p>}
+              {provider === 'ourairports' && <p className="text-amber-300">OurAirports is community-maintained, not official AIP data. Coverage and currency are not verified; do not use for navigation or safety decisions.</p>}
+              <div className="flex gap-2">
+                <button disabled={loading} onClick={() => execute(async () => {
+                  const snapshot = await importCurated(code, provider);
+                  setPreview(snapshot);
+                  await loadHistory();
+                })} className="flex items-center gap-2 px-3 py-2 bg-sky-700 rounded disabled:opacity-50">
+                  {loading ? <Loader2 className="w-4 h-4 animate-spin" /> : <Download className="w-4 h-4" />} Import for review
+                </button>
+                <button disabled={loading} onClick={() => execute(loadHistory)} className="px-3 py-2 bg-slate-800 rounded disabled:opacity-50">Load saved imports</button>
+              </div>
+              {history.length > 0 && (
+                <label className="block text-slate-300">Saved curated imports
+                  <select value={preview?.id ?? ''} onChange={event => {
+                    if (event.target.value) void execute(async () => setPreview(await getCuratedSnapshot(code, Number(event.target.value))));
+                  }} className="block w-full mt-1 p-2 bg-slate-950 border border-slate-700 rounded">
+                    <option value="">Select a snapshot to review</option>
+                    {history.map(item => <option key={item.id} value={item.id}>{item.provider} — {item.effectiveDate || item.capturedAt || 'date unknown'} — {item.featureCount} features{item.active ? ' (active)' : ''}</option>)}
+                  </select>
                 </label>
-                <div className="flex gap-2">
-                  <input
-                    type="text"
-                    value={searchIcao}
-                    onChange={(e) => setSearchIcao(e.target.value.toUpperCase())}
-                    placeholder="e.g. KJFK, LFPG, RJTT, WSSS, YSSY..."
-                    className="flex-1 bg-slate-950 border border-slate-700 rounded-lg px-3 py-2 text-sm text-white focus:outline-none focus:border-sky-500 font-mono uppercase"
-                  />
-                  <button
-                    onClick={handleFetchOsm}
-                    disabled={isLoading}
-                    className="flex items-center gap-2 px-4 py-2 bg-sky-600 hover:bg-sky-500 disabled:opacity-50 text-white font-semibold rounded-lg transition-colors text-xs shadow-md"
-                  >
-                    {isLoading ? (
-                      <>
-                        <Loader2 className="w-4 h-4 animate-spin" />
-                        <span>Querying...</span>
-                      </>
-                    ) : (
-                      <>
-                        <Download className="w-4 h-4" />
-                        <span>Fetch &amp; Convert</span>
-                      </>
-                    )}
-                  </button>
+              )}
+              {preview && (
+                <div className="p-3 bg-slate-950 border border-slate-700 rounded space-y-2">
+                  <p className="text-white font-semibold">{preview.dataset.name} ({preview.dataset.icao})</p>
+                  <p className="text-emerald-300">Saved in the database as snapshot #{preview.id}. Activation is separate.</p>
+                  <p>{preview.provider || 'Legacy curated seed'} · effective {preview.effectiveDate || 'unknown'} · {preview.dataset.features.length} features</p>
+                  <p>{preview.coverage || 'Original baseline provenance is unverified.'}</p>
+                  {preview.attribution && <p>Attribution: {preview.attribution}</p>}
+                  {preview.license && <p className="text-amber-300">{preview.license}</p>}
+                  {preview.comparison && <div>
+                    <p>{preview.comparison.baselineAvailable ? 'Baseline at import vs snapshot counts:' : 'No curated baseline at import; snapshot counts:'}</p>
+                    {Array.from(new Set([...Object.keys(preview.comparison.baselineCounts), ...Object.keys(preview.comparison.importCounts)])).sort().map(name =>
+                      <p key={name}>{name}: {preview.comparison?.baselineCounts[name] || 0} → {preview.comparison?.importCounts[name] || 0}</p>)}
+                    {(preview.comparison.runways ?? []).map(runway => <p key={runway.designator}>
+                      {runway.designator}: length {runway.baselineLength ?? 'unknown'} → {runway.importLength ?? 'unknown'} m;
+                      width {runway.baselineWidth ?? 'unknown'} → {runway.importWidth ?? 'unknown'} m
+                    </p>)}
+                  </div>}
+                  {preview.skippedRunways && preview.skippedRunways.length > 0 && <p className="text-amber-300">Unmapped runway records: {preview.skippedRunways.join(', ')}</p>}
+                  {preview.sourceUrl && <a className="text-sky-400 underline" href={preview.sourceUrl} target="_blank" rel="noreferrer">Source archive</a>}
+                  <p className="text-amber-300">Activation replaces the displayed baseline with this snapshot, including any missing classes. Existing data remains stored.</p>
+                  <button disabled={loading} onClick={() => execute(async () => {
+                    await activateCuratedSnapshot(code, preview.id);
+                    onCuratedActivated(code);
+                    onClose();
+                  })} className="block px-3 py-2 bg-amber-700 rounded disabled:opacity-50">Activate reviewed snapshot</button>
                 </div>
-              </div>
-
-              {/* Sample Suggestions */}
-              <div>
-                <span className="text-[10px] text-slate-500 uppercase block mb-1.5">
-                  Suggested Global Airports:
-                </span>
-                <div className="flex flex-wrap gap-1.5">
-                  {['KJFK', 'KLAX', 'LFPG', 'EHAM', 'RJTT', 'WSSS'].map((code) => (
-                    <button
-                      key={code}
-                      onClick={() => setSearchIcao(code)}
-                      className="px-2.5 py-1 bg-slate-800 hover:bg-slate-700 text-slate-300 rounded text-xs transition-colors border border-slate-700"
-                    >
-                      {code}
-                    </button>
-                  ))}
-                </div>
-              </div>
+              )}
+              <button disabled={loading} onClick={() => execute(async () => {
+                await restoreOriginalBaseline(code);
+                onCuratedActivated(code);
+                onClose();
+              })} className="text-slate-300 underline disabled:opacity-50">Restore original baseline</button>
             </div>
           ) : (
             <div className="space-y-3">
-              <label className="text-[11px] text-slate-400 uppercase tracking-wider block">
-                Paste FAA AC 150/5300-18B GeoJSON Payload
-              </label>
-              <textarea
-                value={faaJsonInput}
-                onChange={(e) => setFaaJsonInput(e.target.value)}
-                placeholder='{ "type": "FeatureCollection", "features": [...] }'
-                rows={5}
-                className="w-full bg-slate-950 border border-slate-700 rounded-lg p-2.5 text-xs text-white font-mono focus:outline-none"
-              />
-              <button
-                onClick={handleImportFaaJson}
-                className="w-full flex items-center justify-center gap-2 px-4 py-2.5 bg-sky-600 hover:bg-sky-500 text-white font-semibold rounded-lg transition-colors text-xs"
-              >
-                Parse and Normalize to DO-272
+              <p className="text-slate-300">Find and confirm the mapped airport before importing a separate, display-only OSM snapshot. A mapped airport boundary is required.</p>
+              <button disabled={loading} onClick={() => execute(async () => {
+                const found = await findOsmAirports(code);
+                setCandidates(found);
+                setCandidateIndex('');
+                if (!found.length) throw new Error(`No OSM aerodrome with ICAO ${code} was found.`);
+              })} className="px-3 py-2 bg-slate-800 rounded disabled:opacity-50">Find airport</button>
+              {candidates.length > 0 && (
+                <label className="block">Confirm airport
+                  <select value={candidateIndex} onChange={event => setCandidateIndex(event.target.value)} className="block w-full mt-1 p-2 bg-slate-950 border border-slate-700 rounded">
+                    <option value="">Select a matching airport</option>
+                    {candidates.map((candidate, index) => <option key={`${candidate.type}-${candidate.id}`} value={index}>{candidate.name} — {candidate.center.join(', ')} — {candidate.type}/{candidate.id}{candidate.type === 'node' ? ' (no boundary)' : ''}</option>)}
+                  </select>
+                </label>
+              )}
+              <button disabled={loading} onClick={() => execute(async () => {
+                if (candidateIndex === '') throw new Error('Find and select an airport first.');
+                const snapshot = await fetchOsmAerodrome(code, candidates[Number(candidateIndex)]);
+                await onOsmLoaded(snapshot);
+                onClose();
+              })} className="px-3 py-2 bg-sky-700 rounded disabled:opacity-50">
+                {loading ? 'Fetching…' : 'Fetch and save OSM'}
               </button>
             </div>
           )}
-
-          {/* Status Alert */}
-          {statusMessage && (
-            <div
-              className={`p-3 rounded-lg border flex items-center gap-2 text-xs ${
-                isError
-                  ? 'bg-rose-950/40 border-rose-900 text-rose-300'
-                  : 'bg-sky-950/40 border-sky-900 text-sky-300'
-              }`}
-            >
-              {isError ? (
-                <AlertCircle className="w-4 h-4 text-rose-400 shrink-0" />
-              ) : (
-                <CheckCircle className="w-4 h-4 text-emerald-400 shrink-0" />
-              )}
-              <span>{statusMessage}</span>
-            </div>
-          )}
+          {error && <div role="alert" className="flex gap-2 p-3 bg-rose-950 border border-rose-900 rounded text-rose-200"><AlertCircle className="w-4 h-4 shrink-0" />{error}</div>}
         </div>
       </div>
     </div>

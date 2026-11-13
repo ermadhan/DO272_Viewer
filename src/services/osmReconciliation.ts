@@ -20,7 +20,7 @@ function normalizedName(name: string, runway: boolean): string {
   return parts.length === 2 ? parts.sort().join('/') : cleaned;
 }
 
-function coords(value: OsmFeature['coordinates'] | AnyDO272Feature['coordinates']): Coord[] {
+function coords(value: AnyDO272Feature['coordinates']): Coord[] {
   return typeof value[0] === 'number' ? [value as Coord] : value as Coord[];
 }
 
@@ -71,7 +71,8 @@ function distanceToFeature(point: Coord, feature: AnyDO272Feature): number {
   const points = coords(feature.coordinates);
   if (!points.length) return Infinity;
   if (points.length === 1) return distance(point, points[0]);
-  const polygon = ['RunwayElement', 'TaxiwayElement', 'ApronElement', 'ParkingStandArea'].includes(feature.featureClass);
+  const polygon = feature.geometryType !== 'LineString' &&
+    ['RunwayElement', 'TaxiwayElement', 'ApronElement', 'ParkingStandArea'].includes(feature.featureClass);
   if (polygon && points.length >= 3 && pointInPolygon(point, points)) return 0;
   let minimum = Infinity;
   for (let i = 1; i < points.length; i++) minimum = Math.min(minimum, pointSegment(point, points[i - 1], points[i]));
@@ -80,7 +81,10 @@ function distanceToFeature(point: Coord, feature: AnyDO272Feature): number {
 }
 
 function samples(feature: OsmFeature): Coord[] {
-  const points = coords(feature.coordinates);
+  if (feature.geometryType === 'GeometryCollection') {
+    return (feature.coordinates as Coord[][]).flat();
+  }
+  const points = coords(feature.coordinates as Coord | Coord[]);
   const result: Coord[] = [...points];
   for (let i = 1; i < points.length; i++) {
     result.push([(points[i - 1][0] + points[i][0]) / 2, (points[i - 1][1] + points[i][1]) / 2]);
@@ -89,6 +93,7 @@ function samples(feature: OsmFeature): Coord[] {
 }
 
 export function osmCandidateClass(feature: OsmFeature): string | undefined {
+  if (feature.geometryType === 'GeometryCollection') return undefined;
   switch (feature.aeroway) {
     case 'runway': return 'RunwayElement';
     case 'taxiway': return feature.geometryType === 'LineString' ? 'TaxiwayGuidanceLine' : undefined;
@@ -152,7 +157,7 @@ export function reconcileOsm(dataset: AerodromeDataset, features: OsmFeature[]):
           const item = features[index];
           if (item.aeroway !== seed.aeroway || item.geometryType !== 'LineString' ||
               normalizedName(item.tags.ref || '', seed.aeroway === 'runway') !== name) continue;
-          if (group.some(existing => connectedAlongLine(coords(item.coordinates), coords(existing.coordinates)))) {
+          if (group.some(existing => connectedAlongLine(coords(item.coordinates as Coord[]), coords(existing.coordinates as Coord[])))) {
             group.push(item);
             pending.delete(index);
             grew = true;

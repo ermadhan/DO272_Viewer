@@ -30,11 +30,10 @@ import {
   AerodromeSummary,
   getAerodromeDataset,
   getAerodromes,
-  getDatabaseEngine,
+  getDatabaseInfo,
   getOsmSnapshot,
   getOsmSnapshots,
   OsmSnapshotSummary,
-  saveAerodromeDataset,
   saveOsmSnapshot,
   setDatabaseEngine as switchDatabaseEngine,
 } from './services/aerodromeApi';
@@ -45,6 +44,7 @@ export default function App() {
   // Navigation & View State
   const [activeTab, setActiveTab] = useState<'map' | 'features' | 'routing' | 'obstacles' | 'sql' | 'mcp' | 'agent' | 'windows'>('map');
   const [databaseEngine, setDatabaseEngine] = useState<DatabaseEngine>('sqlite');
+  const [databaseLocation, setDatabaseLocation] = useState<string | null>(null);
   const [isFetchingLiveOsm, setIsFetchingLiveOsm] = useState<boolean>(false);
   const [selectedIcao, setSelectedIcao] = useState<string>('KSFO');
   const [aerodromes, setAerodromes] = useState<AerodromeSummary[]>([]);
@@ -62,11 +62,12 @@ export default function App() {
   useEffect(() => {
     let cancelled = false;
     setIsLoadingDataset(true);
-    Promise.all([getAerodromes(), getDatabaseEngine()])
-      .then(([loadedAerodromes, activeEngine]) => {
+    Promise.all([getAerodromes(), getDatabaseInfo()])
+      .then(([loadedAerodromes, databaseInfo]) => {
         if (cancelled) return;
         setAerodromes(loadedAerodromes);
-        setDatabaseEngine(activeEngine);
+        setDatabaseEngine(databaseInfo.active_engine);
+        setDatabaseLocation(databaseInfo.database_location);
         setSelectedIcao((currentIcao) =>
           loadedAerodromes.some((aerodrome) => aerodrome.icao === currentIcao)
             ? currentIcao
@@ -196,30 +197,6 @@ export default function App() {
     return counts;
   }, [currentDataset]);
 
-  const handleDatasetLoaded = async (newDataset: AerodromeDataset) => {
-    const savedDataset = await saveAerodromeDataset(newDataset);
-    setAerodromes((previous) => {
-      const summary: AerodromeSummary = {
-        icao: savedDataset.icao,
-        iata: savedDataset.iata,
-        name: savedDataset.name,
-        city: savedDataset.city,
-        country: savedDataset.country,
-        featureCount: savedDataset.features.length,
-      };
-      return [
-        ...previous.filter((aerodrome) => aerodrome.icao !== savedDataset.icao),
-        summary,
-      ].sort((a, b) => a.icao.localeCompare(b.icao));
-    });
-    setCurrentDataset(savedDataset);
-    setSelectedIcao(savedDataset.icao);
-    setApiError(null);
-    setActiveRoute(null);
-    setSelectedFeature(null);
-    setHighlightedFeatureIds([]);
-  };
-
   const handleSyncLiveOsm = async () => {
     setIsFetchingLiveOsm(true);
     try {
@@ -255,8 +232,9 @@ export default function App() {
     try {
       const activeEngine = await switchDatabaseEngine(engine);
       setDatabaseEngine(activeEngine);
-      const loadedAerodromes = await getAerodromes();
+      const [loadedAerodromes, databaseInfo] = await Promise.all([getAerodromes(), getDatabaseInfo()]);
       setAerodromes(loadedAerodromes);
+      setDatabaseLocation(databaseInfo.database_location);
       setSelectedIcao((currentIcao) =>
         loadedAerodromes.some((aerodrome) => aerodrome.icao === currentIcao)
           ? currentIcao
@@ -383,10 +361,22 @@ export default function App() {
             {currentDataset.source === 'OpenStreetMap Aeroway Ingest' && (
               <span className="text-amber-300">No curated baseline. OSM is display-only.</span>
             )}
+            {currentDataset.source === 'NATS UK AIP (partial)' && (
+              <span className="text-amber-300">
+                Data: <a className="underline" href="https://nats-uk.ead-it.com/cms-nats/opencms/en/Publications/digital-datasets/" target="_blank" rel="noreferrer">UK AIS / NATS</a>.
+                Partial, adapted threshold lines; aviation use only, not for resale.
+              </span>
+            )}
+            {currentDataset.source === 'OurAirports community (partial)' && (
+              <span className="text-amber-300">
+                Data: <a className="underline" href="https://github.com/davidmegginson/ourairports-data" target="_blank" rel="noreferrer">OurAirports contributors</a>.
+                Community data, not official or safety-validated.
+              </span>
+            )}
           </div>
           {showReview && osmSnapshot && (
             <div className="max-h-40 overflow-auto border-b border-amber-900 bg-slate-950 px-6 py-2 text-xs">
-              <p className="mb-1 text-slate-400">Heuristic matches or name-only candidates; verify differences against authoritative data. OSM features come from a bounding box and may include other airports.</p>
+              <p className="mb-1 text-slate-400">Heuristic matches or name-only candidates; verify differences against authoritative data. Legacy imports may include nearby airports.</p>
               {osmReviewGroups.length === 0 && <p className="text-slate-400">No conflicts or ambiguous matches found.</p>}
               {osmReviewGroups.map(group => (
                 <div key={group.features[0].id} className="text-amber-200">
@@ -459,6 +449,7 @@ export default function App() {
                       <p>Geometry: {selectedOsm.geometryType}</p>
                       <p>Candidate class: {osmCandidateClass(selectedOsm) || 'Unclassified'}</p>
                       <pre className="mt-2 whitespace-pre-wrap break-all text-slate-300">{JSON.stringify(selectedOsm.tags, null, 2)}</pre>
+                      {selectedOsm.members && <pre className="mt-2 whitespace-pre-wrap break-all text-slate-300">{JSON.stringify(selectedOsm.members, null, 2)}</pre>}
                     </div>
                   )}
                 </div>
@@ -530,8 +521,17 @@ export default function App() {
       <DataIngestModal
         isOpen={isIngestOpen}
         onClose={() => setIsIngestOpen(false)}
-        onDatasetLoaded={handleDatasetLoaded}
+        selectedIcao={selectedIcao}
+        databaseEngine={databaseEngine}
+        databaseLocation={databaseLocation}
         onOsmLoaded={handleOsmLoaded}
+        onCuratedActivated={icao => {
+          setSelectedIcao(icao);
+          setRefreshKey(key => key + 1);
+          setActiveRoute(null);
+          setSelectedFeature(null);
+          setHighlightedFeatureIds([]);
+        }}
       />
 
       <DO272CatalogueModal
